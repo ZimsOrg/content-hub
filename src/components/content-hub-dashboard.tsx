@@ -607,9 +607,10 @@ function CalendarView() {
   const monthEnd = addDays(startOfWeek(endOfMonth(month), { weekStartsOn: 0 }), 6);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const agenda = sortPostsByDate(data.posts.filter((post) => postMatchesDate(post, selectedDate)));
-  const weekStrip = Array.from({ length: 7 }, (_, index) =>
-    addDays(startOfWeek(selectedDate, { weekStartsOn: 0 }), index),
-  );
+  const handleMonthChange = (nextMonth: Date) => {
+    setMonth(nextMonth);
+    setSelectedDate(startOfMonth(nextMonth));
+  };
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -624,54 +625,32 @@ function CalendarView() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => setMonth(subMonths(month, 1))}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleMonthChange(subMonths(month, 1))}
+                >
                   <ChevronLeft />
                 </Button>
-                <Button variant="outline" size="icon" onClick={() => setMonth(addMonths(month, 1))}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleMonthChange(addMonths(month, 1))}
+                >
                   <ChevronRight />
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-7 gap-2 md:hidden">
-              {weekStrip.map((date) => {
-                const posts = data.posts.filter((post) => postMatchesDate(post, date));
-                return (
-                  <button
-                    key={date.toISOString()}
-                    className={cn(
-                      "min-h-16 rounded-2xl border px-2 py-2 text-left transition",
-                      isSameDay(date, selectedDate)
-                        ? "border-foreground/20 bg-foreground/5"
-                        : "border-border/70 bg-background/60",
-                    )}
-                    onClick={() => setSelectedDate(date)}
-                    type="button"
-                  >
-                    <div className="text-xs text-muted-foreground">{format(date, "EEE")}</div>
-                    <div className="mt-1 text-base font-medium">{format(date, "d")}</div>
-                    <div className="mt-2 flex gap-1">
-                      {posts.slice(0, 3).map((post) => (
-                        <span
-                          key={post.id}
-                          className="size-2 rounded-full"
-                          style={{ backgroundColor: getPlatformColor(post.platform) }}
-                        />
-                      ))}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
           </CardHeader>
           <CardContent>
-            <div className="hidden grid-cols-7 gap-2 pb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground md:grid">
+            <div className="grid grid-cols-7 gap-1 pb-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground md:gap-2 md:px-0 md:text-xs md:tracking-[0.2em]">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <div key={day} className="px-3">
+                <div key={day} className="px-1 text-center md:px-3 md:text-left">
                   {day}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
               {days.map((date) => {
                 const posts = sortPostsByDate(data.posts.filter((post) => postMatchesDate(post, date)));
                 const isActive = isSameDay(date, selectedDate);
@@ -680,7 +659,7 @@ function CalendarView() {
                   <button
                     key={date.toISOString()}
                     className={cn(
-                      "hidden min-h-28 rounded-3xl border p-3 text-left transition md:block",
+                      "min-h-20 rounded-2xl border p-2 text-left transition md:min-h-28 md:rounded-3xl md:p-3",
                       isActive
                         ? "border-foreground/15 bg-foreground/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                         : "border-border/70 bg-background/75 hover:bg-muted/40",
@@ -692,13 +671,13 @@ function CalendarView() {
                     <div className="flex items-center justify-between">
                       <span
                         className={cn(
-                          "flex size-8 items-center justify-center rounded-full text-sm",
+                          "flex size-7 items-center justify-center rounded-full text-xs font-medium md:size-8 md:text-sm",
                           isToday(date) && "bg-foreground text-background",
                         )}
                       >
                         {format(date, "d")}
                       </span>
-                      <div className="flex gap-1">
+                      <div className="hidden gap-1 md:flex">
                         {posts.slice(0, 2).map((post) => (
                           <span
                             key={post.id}
@@ -708,7 +687,16 @@ function CalendarView() {
                         ))}
                       </div>
                     </div>
-                    <div className="mt-4 space-y-1.5">
+                    <div className="mt-2 flex flex-wrap gap-1 md:hidden">
+                      {posts.slice(0, 4).map((post) => (
+                        <span
+                          key={post.id}
+                          className="size-1.5 rounded-full"
+                          style={{ backgroundColor: getPlatformColor(post.platform) }}
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-4 hidden space-y-1.5 md:block">
                       {posts.slice(0, 2).map((post) => (
                         <div
                           key={post.id}
