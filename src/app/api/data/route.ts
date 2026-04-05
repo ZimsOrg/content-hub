@@ -6,7 +6,10 @@ import type { ContentHubData } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const dataDirectory = path.join(process.cwd(), "data");
+const isVercel = !!process.env.VERCEL;
+const dataDirectory = isVercel
+  ? path.join("/tmp", "content-hub-data")
+  : path.join(process.cwd(), "data");
 const dataFilePath = path.join(dataDirectory, "content-hub.json");
 
 function getDefaultData(): ContentHubData {
