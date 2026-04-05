@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { createContext, useContext, useEffect, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
 import {
   addDays,
   addMonths,
@@ -249,6 +249,138 @@ function useImageViewer() {
   return useContext(ImageViewerContext);
 }
 
+function ImageViewerOverlay({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const lastTouchRef = useRef<{ dist: number; x: number; y: number; scale: number; tx: number; ty: number } | null>(null);
+  const lastTapRef = useRef(0);
+  const imgRef = useRef<HTMLDivElement>(null);
+
+  function resetTransform() {
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+  }
+
+  function handleTouchStart(event: React.TouchEvent) {
+    if (event.touches.length === 2) {
+      const dx = event.touches[0].clientX - event.touches[1].clientX;
+      const dy = event.touches[0].clientY - event.touches[1].clientY;
+      lastTouchRef.current = {
+        dist: Math.hypot(dx, dy),
+        x: (event.touches[0].clientX + event.touches[1].clientX) / 2,
+        y: (event.touches[0].clientY + event.touches[1].clientY) / 2,
+        scale,
+        tx: translate.x,
+        ty: translate.y,
+      };
+    } else if (event.touches.length === 1 && scale > 1) {
+      lastTouchRef.current = {
+        dist: 0,
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY,
+        scale,
+        tx: translate.x,
+        ty: translate.y,
+      };
+    }
+  }
+
+  function handleTouchMove(event: React.TouchEvent) {
+    if (!lastTouchRef.current) return;
+
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dx = event.touches[0].clientX - event.touches[1].clientX;
+      const dy = event.touches[0].clientY - event.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const newScale = Math.min(Math.max(lastTouchRef.current.scale * (dist / lastTouchRef.current.dist), 1), 5);
+      setScale(newScale);
+
+      const mx = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+      const my = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+      setTranslate({
+        x: lastTouchRef.current.tx + (mx - lastTouchRef.current.x),
+        y: lastTouchRef.current.ty + (my - lastTouchRef.current.y),
+      });
+    } else if (event.touches.length === 1 && scale > 1) {
+      const dx = event.touches[0].clientX - lastTouchRef.current.x;
+      const dy = event.touches[0].clientY - lastTouchRef.current.y;
+      setTranslate({
+        x: lastTouchRef.current.tx + dx,
+        y: lastTouchRef.current.ty + dy,
+      });
+    }
+  }
+
+  function handleTouchEnd() {
+    lastTouchRef.current = null;
+    if (scale <= 1.05) resetTransform();
+  }
+
+  function handleDoubleTap(event: React.TouchEvent) {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      event.preventDefault();
+      if (scale > 1) {
+        resetTransform();
+      } else {
+        setScale(2.5);
+        const rect = imgRef.current?.getBoundingClientRect();
+        if (rect) {
+          const cx = event.changedTouches[0].clientX - rect.left - rect.width / 2;
+          const cy = event.changedTouches[0].clientY - rect.top - rect.height / 2;
+          setTranslate({ x: -cx * 1.5, y: -cy * 1.5 });
+        }
+      }
+    }
+    lastTapRef.current = now;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
+      onClick={() => { if (scale <= 1) onClose(); }}
+      role="dialog"
+      aria-label={alt || "Image viewer"}
+    >
+      <button
+        type="button"
+        className="absolute top-[max(env(safe-area-inset-top,12px),12px)] right-4 z-10 flex size-12 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur transition active:bg-white/30"
+        onClick={(event) => { event.stopPropagation(); onClose(); }}
+        aria-label="Close"
+      >
+        <X className="size-6" />
+      </button>
+
+      <p className="absolute bottom-[max(env(safe-area-inset-bottom,12px),12px)] left-0 right-0 text-center text-sm text-white/50">
+        {scale <= 1 ? "Double-tap to zoom · Pinch to zoom" : `${Math.round(scale * 100)}%`}
+      </p>
+
+      <div
+        ref={imgRef}
+        className="flex h-full w-full items-center justify-center overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={(event) => { handleTouchEnd(); handleDoubleTap(event); }}
+        style={{ touchAction: "none" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          className="max-h-full max-w-full object-contain transition-transform"
+          style={{
+            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+            transitionDuration: lastTouchRef.current ? "0ms" : "200ms",
+          }}
+          draggable={false}
+          onClick={(event) => event.stopPropagation()}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ImageViewerProvider({ children }: { children: React.ReactNode }) {
   const [src, setSrc] = useState<string | null>(null);
   const [alt, setAlt] = useState("");
@@ -261,33 +393,7 @@ function ImageViewerProvider({ children }: { children: React.ReactNode }) {
   return (
     <ImageViewerContext.Provider value={{ openImage }}>
       {children}
-      {src ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
-          onClick={() => setSrc(null)}
-          role="dialog"
-          aria-label={alt || "Image viewer"}
-        >
-          <button
-            type="button"
-            className="absolute top-4 right-4 z-10 flex size-11 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-white/25"
-            onClick={() => setSrc(null)}
-            aria-label="Close"
-          >
-            <X className="size-6" />
-          </button>
-          <div className="h-full w-full overflow-auto overscroll-contain p-4 [&>img]:touch-manipulation">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={src}
-              alt={alt}
-              className="mx-auto max-w-none cursor-zoom-in object-contain"
-              style={{ maxHeight: "none", touchAction: "pinch-zoom" }}
-              onClick={(event) => event.stopPropagation()}
-            />
-          </div>
-        </div>
-      ) : null}
+      {src ? <ImageViewerOverlay src={src} alt={alt} onClose={() => setSrc(null)} /> : null}
     </ImageViewerContext.Provider>
   );
 }
