@@ -63,7 +63,6 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Card,
   CardContent,
@@ -487,23 +486,33 @@ function ScheduleIdeaDialog({
           </DialogDescription>
         </DialogHeader>
         {idea ? (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
               <p className="font-medium">{idea.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{idea.description}</p>
+              {idea.description ? (
+                <p className="mt-1 text-sm text-muted-foreground">{idea.description}</p>
+              ) : null}
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Publish date</label>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="w-full rounded-2xl border border-border/70"
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Time</label>
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Date
+                </label>
+                <Input
+                  className="h-11"
+                  type="date"
+                  value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
+                  onChange={(event) => {
+                    const d = event.target.value ? parseISO(event.target.value) : undefined;
+                    setSelectedDate(d);
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Time
+                </label>
                 <Input
                   className="h-11"
                   type="time"
@@ -511,25 +520,47 @@ function ScheduleIdeaDialog({
                   onChange={(event) => setSelectedTime(event.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Platform</label>
-                <Select
-                  value={selectedPlatform}
-                  onValueChange={(value) => setSelectedPlatform(value as PostPlatform)}
-                >
-                  <SelectTrigger className="h-11 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availablePlatforms.map((platform) => (
-                      <SelectItem key={platform} value={platform}>
-                        {PLATFORM_META[platform].label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Platform
+              </label>
+              <div className="inline-flex rounded-xl border border-border/70 bg-muted/30 p-0.5">
+                {availablePlatforms.map((platform) => (
+                  <button
+                    key={platform}
+                    type="button"
+                    className={cn(
+                      "rounded-[10px] px-4 py-2 text-sm font-medium transition",
+                      selectedPlatform === platform
+                        ? "bg-foreground text-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setSelectedPlatform(platform)}
+                  >
+                    {PLATFORM_META[platform].label}
+                  </button>
+                ))}
               </div>
             </div>
+
+            {selectedDate ? (
+              <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  Publishing on{" "}
+                  <span className="font-medium text-foreground">
+                    {format(selectedDate, "EEEE, MMMM d")}
+                  </span>{" "}
+                  at{" "}
+                  <span className="font-medium text-foreground">{selectedTime || "9:00 AM"}</span>{" "}
+                  on{" "}
+                  <span className="font-medium text-foreground">
+                    {PLATFORM_META[selectedPlatform].label}
+                  </span>
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
         <DialogFooter>
