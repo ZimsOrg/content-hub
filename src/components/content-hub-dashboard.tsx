@@ -313,13 +313,11 @@ function ImageViewerOverlay({ src, alt, onClose }: { src: string; alt: string; o
   }
 
   function handleTouchEnd(event: React.TouchEvent) {
-    // Only reset tracking when ALL fingers are lifted
     if (event.touches.length === 0) {
+      // All fingers lifted — keep current zoom, just stop tracking
       lastTouchRef.current = null;
-      // Only snap back if barely zoomed
-      if (scale < 1.15) resetTransform();
-    } else if (event.touches.length === 1 && scale > 1) {
-      // Went from pinch to pan — update the single-finger tracking
+    } else if (event.touches.length === 1) {
+      // Went from 2 fingers to 1 — switch to pan mode
       lastTouchRef.current = {
         dist: 0,
         x: event.touches[0].clientX,
