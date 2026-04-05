@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
+import { createContext, useContext, useEffect, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
 import {
   addDays,
   addMonths,
@@ -235,6 +235,74 @@ function getImageDownloadName(post: Post) {
   return extension
     ? `${slug || "content-hub-image"}.${extension}`
     : `${slug || "content-hub-image"}.jpg`;
+}
+
+// ---------------------------------------------------------------------------
+// Fullscreen Image Viewer
+// ---------------------------------------------------------------------------
+
+const ImageViewerContext = createContext<{
+  openImage: (src: string, alt?: string) => void;
+}>({ openImage: () => {} });
+
+function useImageViewer() {
+  return useContext(ImageViewerContext);
+}
+
+function ImageViewerProvider({ children }: { children: React.ReactNode }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [alt, setAlt] = useState("");
+
+  function openImage(nextSrc: string, nextAlt?: string) {
+    setSrc(nextSrc);
+    setAlt(nextAlt ?? "");
+  }
+
+  return (
+    <ImageViewerContext.Provider value={{ openImage }}>
+      {children}
+      {src ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setSrc(null)}
+          role="dialog"
+          aria-label={alt || "Image viewer"}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 z-10 flex size-11 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-white/25"
+            onClick={() => setSrc(null)}
+            aria-label="Close"
+          >
+            <X className="size-6" />
+          </button>
+          <div className="h-full w-full overflow-auto overscroll-contain p-4 [&>img]:touch-manipulation">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt={alt}
+              className="mx-auto max-w-none cursor-zoom-in object-contain"
+              style={{ maxHeight: "none", touchAction: "pinch-zoom" }}
+              onClick={(event) => event.stopPropagation()}
+            />
+          </div>
+        </div>
+      ) : null}
+    </ImageViewerContext.Provider>
+  );
+}
+
+function TappableImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const { openImage } = useImageViewer();
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className={cn("cursor-pointer", className)}
+      onClick={() => openImage(src, alt)}
+    />
+  );
 }
 
 function safeNumber(value: number | undefined) {
@@ -747,14 +815,13 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
 
               {post.imageUrl ? (
                 <div className="mt-4 space-y-3">
-                  <a href={post.imageUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                  <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                    <TappableImage
                       src={post.imageUrl}
-                      alt={`Image for ${post.title} — long press to save`}
+                      alt={`Image for ${post.title}`}
                       className="h-auto w-full object-cover"
                     />
-                  </a>
+                  </div>
                   <Button
                     variant="outline"
                     className="h-12 w-full text-base border-border/40"
@@ -1183,12 +1250,9 @@ function DraftsView() {
                           </Button>
                         </div>
                         <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
-                          <Image
+                          <TappableImage
                             src={post.imageUrl}
-                            alt={`Attached image for ${post.title}`}
-                            width={1600}
-                            height={900}
-                            sizes="(max-width: 768px) 100vw, 720px"
+                            alt={`Image for ${post.title}`}
                             className="h-auto max-h-[28rem] w-full object-cover"
                           />
                         </div>
@@ -1662,6 +1726,7 @@ export function ContentHubDashboard() {
   }
 
   return (
+    <ImageViewerProvider>
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.12),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.16),transparent_20%),linear-gradient(180deg,rgba(9,9,11,1),rgba(12,12,14,1))]">
       <header className="sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur">
         <div className="mx-auto flex min-h-18 max-w-3xl items-center justify-between gap-3 px-4 py-3">
@@ -1755,5 +1820,6 @@ export function ContentHubDashboard() {
         </div>
       </nav>
     </div>
+    </ImageViewerProvider>
   );
 }
