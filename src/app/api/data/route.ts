@@ -114,7 +114,7 @@ async function readPosts(): Promise<Post[]> {
 async function readAnalytics(): Promise<AnalyticsEntry[]> {
   const rows = await sql.query("SELECT * FROM analytics ORDER BY date ASC");
   return rows.map((r: Record<string, unknown>) => ({
-    date: (r.date as string).substring(0, 10),
+    date: r.date instanceof Date ? r.date.toISOString().substring(0, 10) : String(r.date).substring(0, 10),
     linkedinFollowers: (r.linkedin_followers as number) || undefined,
     substackSubscribers: (r.substack_subscribers as number) || undefined,
   }));
