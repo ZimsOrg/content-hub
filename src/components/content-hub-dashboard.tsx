@@ -1803,21 +1803,20 @@ export function ContentHubDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-
-  const activeTab = parseTab(searchParams.get("tab"));
+  const [activeTab, setActiveTabState] = useState<TabId>(() => parseTab(searchParams.get("tab")));
 
   function setActiveTab(nextTab: TabId) {
+    setActiveTabState(nextTab);
+    setMobileNavOpen(false);
+
+    // Update URL in background (non-blocking)
     const params = new URLSearchParams(searchParams.toString());
     if (nextTab === "calendar") {
       params.delete("tab");
     } else {
       params.set("tab", nextTab);
     }
-
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, {
-      scroll: false,
-    });
-    setMobileNavOpen(false);
+    window.history.replaceState(null, "", params.size ? `${pathname}?${params.toString()}` : pathname);
   }
 
   if (!isReady) {
@@ -1903,8 +1902,8 @@ export function ContentHubDashboard() {
         {activeTab === "settings" ? <SettingsView /> : null}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/92 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-5 gap-1">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/92 px-1 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1 backdrop-blur">
+        <div className="mx-auto grid max-w-3xl grid-cols-5">
           {TAB_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = item.id === activeTab;
@@ -1912,10 +1911,14 @@ export function ContentHubDashboard() {
               <button
                 key={item.id}
                 className={cn(
-                  "flex min-h-11 flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition",
+                  "flex min-h-14 flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition-colors active:opacity-70",
                   active ? "bg-foreground text-background" : "text-muted-foreground",
                 )}
                 onClick={() => setActiveTab(item.id)}
+                onTouchEnd={(event) => {
+                  event.preventDefault();
+                  setActiveTab(item.id);
+                }}
                 type="button"
               >
                 <Icon className="mb-0.5 size-6" />
