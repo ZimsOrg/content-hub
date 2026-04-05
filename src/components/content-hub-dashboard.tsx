@@ -1597,40 +1597,6 @@ function SettingsView() {
 
         <Card className="border border-border/40 bg-card/80 backdrop-blur">
           <CardHeader>
-            <CardTitle>Data Controls</CardTitle>
-            <CardDescription>Export the full local store or restore it from JSON.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row">
-            <Button className="h-11 px-4" onClick={handleExport}>
-              <ArrowDownToLine />
-              Export JSON
-            </Button>
-            <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border/40 bg-background px-4 text-sm font-medium hover:bg-muted">
-              <ArrowUpFromLine className="size-4" />
-              Import JSON
-              <input
-                accept="application/json"
-                className="sr-only"
-                type="file"
-                onChange={handleImport}
-              />
-            </label>
-            {isPending ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircle className="size-4 animate-spin" />
-                Importing
-              </div>
-            ) : null}
-          </CardContent>
-          {importError ? (
-            <CardFooter>
-              <p className="text-sm text-destructive">{importError}</p>
-            </CardFooter>
-          ) : null}
-        </Card>
-
-        <Card className="border border-border/40 bg-card/80 backdrop-blur">
-          <CardHeader>
             <CardTitle>Posting Schedule</CardTitle>
             <CardDescription>Configure the target publishing days for each platform.</CardDescription>
           </CardHeader>
