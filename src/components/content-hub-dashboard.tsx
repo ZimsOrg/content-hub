@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useTransition, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
 import {
   addDays,
   addMonths,
@@ -27,6 +27,8 @@ import {
   ChevronRight,
   Circle,
   Clock3,
+  Copy,
+  Download,
   FilePenLine,
   FileText,
   Flame,
@@ -248,6 +250,19 @@ function formatDayLabel(date: Date) {
   return format(date, "EEE, MMM d");
 }
 
+function getImageDownloadName(post: Post) {
+  const pathname = post.imageUrl ? new URL(post.imageUrl, "https://content-hub.local").pathname : "";
+  const extension = pathname.split(".").pop()?.split("?")[0];
+  const slug = post.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  return extension
+    ? `${slug || "content-hub-image"}.${extension}`
+    : `${slug || "content-hub-image"}.jpg`;
+}
+
 function safeNumber(value: number | undefined) {
   return value ?? 0;
 }
@@ -273,6 +288,50 @@ function sortIdeasByPriority(ideas: Idea[]) {
 
     return parseISO(right.updatedAt).getTime() - parseISO(left.updatedAt).getTime();
   });
+}
+
+type CopyPostButtonProps = {
+  content: string;
+  label?: string;
+  compact?: boolean;
+  className?: string;
+};
+
+function CopyPostButton({
+  content,
+  label = "Copy Text",
+  compact = false,
+  className,
+}: CopyPostButtonProps) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [copied]);
+
+  async function handleCopy(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+  }
+
+  return (
+    <Button
+      variant="outline"
+      className={cn("h-11 min-w-11", compact ? "w-11 rounded-xl p-0" : "px-4", className)}
+      onClick={handleCopy}
+      aria-label={copied ? "Copied!" : label}
+      title={copied ? "Copied!" : label}
+    >
+      {copied ? <Check /> : <Copy />}
+      {compact ? <span className="sr-only">{copied ? "Copied!" : label}</span> : copied ? "Copied!" : label}
+    </Button>
+  );
 }
 
 function StatCard({
@@ -754,9 +813,16 @@ function CalendarView() {
                       </div>
                       <CardTitle>{post.title}</CardTitle>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock3 className="size-3.5" />
-                      {format(parseISO(post.scheduledAt), "p")}
+                    <div className="flex shrink-0 items-start gap-2">
+                      <CopyPostButton
+                        content={post.content}
+                        label={`Copy ${post.title} text`}
+                        compact
+                      />
+                      <div className="flex h-11 items-center gap-1 text-xs text-muted-foreground">
+                        <Clock3 className="size-3.5" />
+                        {format(parseISO(post.scheduledAt), "p")}
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -961,39 +1027,63 @@ function DraftsView() {
           return (
             <Card key={post.id} className="border border-border/70 bg-card/80 backdrop-blur">
               <CardHeader>
-                <button
-                  className="flex w-full items-start justify-between gap-4 text-left"
-                  onClick={() => setActivePostId(expanded ? null : post.id)}
-                  type="button"
-                >
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <PlatformBadge platform={post.platform} />
-                      <PostTypeBadge postType={post.postType} />
-                      <StatusBadge value={post.status} />
-                      {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
+                <div className="flex items-start gap-3">
+                  <button
+                    className="flex min-w-0 flex-1 items-start justify-between gap-4 text-left"
+                    onClick={() => setActivePostId(expanded ? null : post.id)}
+                    type="button"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <PlatformBadge platform={post.platform} />
+                        <PostTypeBadge postType={post.postType} />
+                        <StatusBadge value={post.status} />
+                        {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
+                      </div>
+                      <div>
+                        <CardTitle>{post.title}</CardTitle>
+                        <CardDescription className="mt-2 flex flex-wrap items-center gap-3">
+                          <span>{format(parseISO(post.scheduledAt), "EEE, MMM d 'at' p")}</span>
+                          <span>{post.comments.length} comments</span>
+                          <span>{post.revisions.length} revisions</span>
+                        </CardDescription>
+                      </div>
                     </div>
-                    <div>
-                      <CardTitle>{post.title}</CardTitle>
-                      <CardDescription className="mt-2 flex flex-wrap items-center gap-3">
-                        <span>{format(parseISO(post.scheduledAt), "EEE, MMM d 'at' p")}</span>
-                        <span>{post.comments.length} comments</span>
-                        <span>{post.revisions.length} revisions</span>
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <ChevronRight className={cn("mt-1 size-5 transition", expanded && "rotate-90")} />
-                </button>
+                    <ChevronRight className={cn("mt-1 size-5 transition", expanded && "rotate-90")} />
+                  </button>
+                  <CopyPostButton
+                    content={post.content}
+                    label={`Copy ${post.title} text`}
+                    compact
+                    className="shrink-0 self-start"
+                  />
+                </div>
               </CardHeader>
               {expanded ? (
                 <>
                   <CardContent className="space-y-5">
                     <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                          LinkedIn Post Text
+                        </p>
+                        <CopyPostButton content={post.content} />
+                      </div>
                       {post.imageUrl ? (
-                        <div className="mb-4 space-y-2">
-                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            Attached Image
-                          </p>
+                        <div className="mb-4 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                              Attached Image
+                            </p>
+                            <Button
+                              variant="outline"
+                              className="h-11 px-4"
+                              render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
+                            >
+                              <Download />
+                              Download Image
+                            </Button>
+                          </div>
                           <div className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20">
                             <Image
                               src={post.imageUrl}
