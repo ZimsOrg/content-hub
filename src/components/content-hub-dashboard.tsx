@@ -741,7 +741,9 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
                 {format(parseISO(post.scheduledAt), "p")}
               </div>
 
-              <p className="mt-3 text-base leading-7 text-muted-foreground">{post.content}</p>
+              <pre className="mt-3 font-sans whitespace-pre-wrap text-base leading-7 text-muted-foreground">
+                {post.content}
+              </pre>
 
               {post.imageUrl ? (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
@@ -894,7 +896,7 @@ function CalendarView() {
 }
 
 function IdeasView() {
-  const { data } = useContentHub();
+  const { data, updateIdea } = useContentHub();
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
 
@@ -1010,6 +1012,47 @@ function IdeasView() {
                                 Scheduled ✓
                               </div>
                             )}
+
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                              {idea.status === "new" ? (
+                                <Button
+                                  variant="outline"
+                                  className="h-11 w-full text-sm sm:w-auto"
+                                  onClick={() => updateIdea(idea.id, { status: "developing" })}
+                                >
+                                  Move to In Progress →
+                                </Button>
+                              ) : null}
+
+                              {idea.status === "developing" ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    className="h-11 w-full text-sm sm:w-auto"
+                                    onClick={() => updateIdea(idea.id, { status: "new" })}
+                                  >
+                                    ← Move to New
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="h-11 w-full text-sm sm:w-auto"
+                                    onClick={() => updateIdea(idea.id, { status: "ready" })}
+                                  >
+                                    Move to Scheduled →
+                                  </Button>
+                                </>
+                              ) : null}
+
+                              {idea.status === "ready" ? (
+                                <Button
+                                  variant="outline"
+                                  className="h-11 w-full text-sm sm:w-auto"
+                                  onClick={() => updateIdea(idea.id, { status: "developing" })}
+                                >
+                                  ← Move to In Progress
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       ) : null}
