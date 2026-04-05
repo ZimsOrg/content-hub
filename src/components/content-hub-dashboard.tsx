@@ -73,13 +73,13 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+  
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useContentHub } from "@/lib/store";
@@ -483,29 +483,21 @@ function ScheduleIdeaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add To Calendar</DialogTitle>
-          <DialogDescription>
-            Schedule this idea as a draft and attach it to the main calendar.
-          </DialogDescription>
+          <DialogTitle className="text-lg">Schedule Idea</DialogTitle>
         </DialogHeader>
         {idea ? (
           <div className="space-y-5">
-            <div className="rounded-2xl border border-border/40 bg-muted/30 p-4">
-              <p className="font-medium">{idea.title}</p>
-              {idea.description ? (
-                <p className="mt-1 text-sm text-muted-foreground">{idea.description}</p>
-              ) : null}
-            </div>
+            <p className="text-base font-semibold leading-snug">{idea.title}</p>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <label className="text-sm font-medium text-muted-foreground">
                   Date
                 </label>
                 <Input
-                  className="h-11"
+                  className="h-12 text-base"
                   type="date"
                   value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
                   onChange={(event) => {
@@ -515,11 +507,11 @@ function ScheduleIdeaDialog({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <label className="text-sm font-medium text-muted-foreground">
                   Time
                 </label>
                 <Input
-                  className="h-11"
+                  className="h-12 text-base"
                   type="time"
                   value={selectedTime}
                   onChange={(event) => setSelectedTime(event.target.value)}
@@ -527,54 +519,39 @@ function ScheduleIdeaDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Platform
-              </label>
-              <div className="inline-flex rounded-xl border border-border/40 bg-muted/30 p-0.5">
-                {availablePlatforms.map((platform) => (
-                  <button
-                    key={platform}
-                    type="button"
-                    className={cn(
-                      "min-h-11 rounded-[10px] px-4 py-2 text-sm font-medium transition",
-                      selectedPlatform === platform
-                        ? "bg-foreground text-background shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => setSelectedPlatform(platform)}
-                  >
-                    {PLATFORM_META[platform].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {selectedDate ? (
-              <div className="rounded-2xl border border-border/40 bg-muted/20 px-4 py-3">
-                <p className="text-sm text-muted-foreground">
-                  Publishing on{" "}
-                  <span className="font-medium text-foreground">
-                    {format(selectedDate, "EEEE, MMMM d")}
-                  </span>{" "}
-                  at{" "}
-                  <span className="font-medium text-foreground">{selectedTime || "9:00 AM"}</span>{" "}
-                  on{" "}
-                  <span className="font-medium text-foreground">
-                    {PLATFORM_META[selectedPlatform].label}
-                  </span>
-                </p>
+            {availablePlatforms.length > 1 ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Platform
+                </label>
+                <div className="inline-flex rounded-xl border border-border/40 bg-muted/30 p-0.5">
+                  {availablePlatforms.map((platform) => (
+                    <button
+                      key={platform}
+                      type="button"
+                      className={cn(
+                        "min-h-12 rounded-[10px] px-5 py-2 text-base font-medium transition",
+                        selectedPlatform === platform
+                          ? "bg-foreground text-background shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => setSelectedPlatform(platform)}
+                    >
+                      {PLATFORM_META[platform].label}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button disabled={!canSubmit} onClick={handleSchedule}>
+          <Button className="h-12 text-base" disabled={!canSubmit} onClick={handleSchedule}>
             <Send />
-            Schedule draft
+            Schedule for {selectedDate ? format(selectedDate, "MMM d") : "..."} · {PLATFORM_META[selectedPlatform].label}
+          </Button>
+          <Button variant="outline" className="h-12 text-base" onClick={() => onOpenChange(false)}>
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -651,29 +628,28 @@ function DraftActionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle className="text-lg">{title}</DialogTitle>
         </DialogHeader>
         {mode === "edit" ? (
           <Textarea
-            className="min-h-72"
+            className="min-h-72 text-base leading-7"
             value={content}
             onChange={(event) => setContent(event.target.value)}
           />
         ) : (
           <div className="space-y-3">
             {mode === "comment" ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Commenting as</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">As</span>
                 <div className="inline-flex rounded-xl border border-border/40 bg-muted/30 p-0.5">
                   {(["edo", "zima"] as const).map((author) => (
                     <button
                       key={author}
                       type="button"
                       className={cn(
-                        "min-h-11 rounded-[10px] px-3 py-1 text-xs font-medium transition",
+                        "min-h-11 rounded-[10px] px-4 py-1 text-sm font-medium transition",
                         commentAuthor === author
                           ? "bg-foreground text-background shadow-sm"
                           : "text-muted-foreground hover:text-foreground",
@@ -687,11 +663,11 @@ function DraftActionDialog({
               </div>
             ) : null}
             <Textarea
-              className="min-h-36"
+              className="min-h-36 text-base"
               placeholder={
                 config?.requireComment
                   ? "Explain the rejection or revision request"
-                  : "Leave a note for the draft thread"
+                  : "Leave a note"
               }
               value={comment}
               onChange={(event) => setComment(event.target.value)}
@@ -699,10 +675,8 @@ function DraftActionDialog({
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={close}>
-            Cancel
-          </Button>
           <Button
+            className="h-12 text-base"
             disabled={
               mode === "comment"
                 ? !comment.trim()
@@ -712,6 +686,9 @@ function DraftActionDialog({
           >
             {mode === "edit" ? <PencilLine /> : <Check />}
             Save
+          </Button>
+          <Button variant="outline" className="h-12 text-base" onClick={close}>
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1445,25 +1422,24 @@ function AnalyticsView() {
       </Surface>
 
       <Dialog open={Boolean(selectedPost)} onOpenChange={(open) => !open && setSelectedPostId(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update Metrics</DialogTitle>
-            <DialogDescription>Manual entry for published performance stats.</DialogDescription>
+            <DialogTitle className="text-lg">Update Metrics</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3">
             {(
               [
                 ["impressions", "Impressions"],
                 ["comments", "Comments"],
                 ["reposts", "Reposts"],
                 ["reactions", "Reactions"],
-                ["followerDelta", "Follower Delta"],
+                ["followerDelta", "Follower Δ"],
               ] as const
             ).map(([key, label]) => (
               <div key={key} className="space-y-2">
                 <label className="text-sm font-medium">{label}</label>
                 <Input
-                  className="h-11"
+                  className="h-12 text-base"
                   inputMode="numeric"
                   value={metrics[key]}
                   onChange={(event) =>
@@ -1474,12 +1450,12 @@ function AnalyticsView() {
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedPostId(null)}>
-              Cancel
-            </Button>
-            <Button onClick={submitMetrics}>
+            <Button className="h-12 text-base" onClick={submitMetrics}>
               <Check />
               Save metrics
+            </Button>
+            <Button variant="outline" className="h-12 text-base" onClick={() => setSelectedPostId(null)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
