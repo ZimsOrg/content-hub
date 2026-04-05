@@ -936,130 +936,127 @@ function IdeasView() {
           description="Capture new ideas to build the next publishing run."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-3 sm:items-start">
+        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-3 sm:items-start sm:overflow-visible sm:px-0">
           {columns.map((column) => (
-            <section key={column.status} className="space-y-3">
-              <div className={cn("flex items-center justify-between rounded-2xl border border-border/40 px-4 py-3", column.tone)}>
-                <h3 className="text-base font-semibold tracking-tight">{column.title}</h3>
-                <Badge variant="outline" className="min-w-8 justify-center rounded-full px-2.5 ring-1 ring-inset ring-border/40">
+            <section
+              key={column.status}
+              className="flex w-[85vw] shrink-0 snap-center flex-col sm:w-auto"
+            >
+              <div className={cn("sticky top-0 z-10 flex items-center justify-between rounded-2xl border border-border/40 px-5 py-4", column.tone)}>
+                <h3 className="text-lg font-bold tracking-tight">{column.title}</h3>
+                <span className="flex size-7 items-center justify-center rounded-full bg-foreground/10 text-sm font-semibold">
                   {column.ideas.length}
-                </Badge>
+                </span>
               </div>
 
-              {column.ideas.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border/50 px-4 py-6 text-base text-muted-foreground">
-                  No ideas in this stage.
-                </div>
-              ) : (
-                column.ideas.map((idea) => {
-                  const expanded = expandedIdeaId === idea.id;
+              <div className="mt-3 flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: "calc(100vh - 14rem)" }}>
+                {column.ideas.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border/50 px-4 py-8 text-center text-base text-muted-foreground">
+                    No ideas yet
+                  </div>
+                ) : (
+                  column.ideas.map((idea) => {
+                    const expanded = expandedIdeaId === idea.id;
 
-                  return (
-                    <Surface key={idea.id} className="overflow-hidden p-0">
-                      <button
-                        type="button"
-                        className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left sm:p-5"
-                        onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-lg font-semibold leading-7">{idea.title}</p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Badge
-                              className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)}
-                              variant="outline"
-                            >
-                              {PRIORITY_META[idea.priority].label}
-                            </Badge>
-                            <PlatformBadge platform={idea.platform} />
+                    return (
+                      <Surface key={idea.id} className="overflow-hidden p-0">
+                        <button
+                          type="button"
+                          className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left"
+                          onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-lg font-semibold leading-7">{idea.title}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Badge
+                                className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)}
+                                variant="outline"
+                              >
+                                {PRIORITY_META[idea.priority].label}
+                              </Badge>
+                              <PlatformBadge platform={idea.platform} />
+                            </div>
                           </div>
-                        </div>
-                        <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
-                      </button>
+                          <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
+                        </button>
 
-                      {expanded ? (
-                        <div className="border-t border-border/40 px-4 py-4 sm:px-5">
-                          <div className="space-y-4">
-                            <div>
+                        {expanded ? (
+                          <div className="border-t border-border/40 px-4 py-4">
+                            <div className="space-y-4">
                               <p className="text-base leading-7 text-muted-foreground">
                                 {idea.description || "No description yet."}
                               </p>
-                            </div>
 
-                            {(idea.tags ?? []).length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {(idea.tags ?? []).map((tag) => (
-                                  <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
-                                    <Link2 />
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : null}
-
-                            <div className="flex flex-wrap items-center gap-2 text-base text-muted-foreground">
-                              <StatusBadge value={idea.status} />
-                              <PostTypeBadge postType={idea.postType} />
-                              <span>Updated {format(parseISO(idea.updatedAt), "MMM d, yyyy")}</span>
-                            </div>
-
-                            {idea.status !== "ready" ? (
-                              <Button className="h-11 w-full sm:w-auto" onClick={() => setSelectedIdea(idea)}>
-                                <Plus />
-                                Add to Calendar
-                              </Button>
-                            ) : (
-                              <div className="flex min-h-11 items-center text-base font-medium text-emerald-700 dark:text-emerald-400">
-                                Scheduled ✓
-                              </div>
-                            )}
-
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                              {idea.status === "new" ? (
-                                <Button
-                                  variant="outline"
-                                  className="h-12 w-full text-base sm:w-auto"
-                                  onClick={() => updateIdea(idea.id, { status: "developing" })}
-                                >
-                                  Move to In Progress →
-                                </Button>
+                              {(idea.tags ?? []).length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {(idea.tags ?? []).map((tag) => (
+                                    <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
+                                      <Link2 />
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
                               ) : null}
 
-                              {idea.status === "developing" ? (
-                                <>
+                              {idea.status !== "ready" ? (
+                                <Button className="h-12 w-full text-base" onClick={() => setSelectedIdea(idea)}>
+                                  <Plus />
+                                  Add to Calendar
+                                </Button>
+                              ) : (
+                                <div className="flex min-h-11 items-center text-base font-medium text-emerald-700 dark:text-emerald-400">
+                                  Scheduled ✓
+                                </div>
+                              )}
+
+                              <div className="flex flex-col gap-2">
+                                {idea.status === "new" ? (
                                   <Button
                                     variant="outline"
-                                    className="h-12 w-full text-base sm:w-auto"
-                                    onClick={() => updateIdea(idea.id, { status: "new" })}
+                                    className="h-12 w-full text-base"
+                                    onClick={() => updateIdea(idea.id, { status: "developing" })}
                                   >
-                                    ← Move to New
+                                    Move to In Progress →
                                   </Button>
+                                ) : null}
+
+                                {idea.status === "developing" ? (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      className="h-12 w-full text-base"
+                                      onClick={() => updateIdea(idea.id, { status: "new" })}
+                                    >
+                                      ← Move to New
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      className="h-12 w-full text-base"
+                                      onClick={() => updateIdea(idea.id, { status: "ready" })}
+                                    >
+                                      Move to Scheduled →
+                                    </Button>
+                                  </>
+                                ) : null}
+
+                                {idea.status === "ready" ? (
                                   <Button
                                     variant="outline"
-                                    className="h-12 w-full text-base sm:w-auto"
-                                    onClick={() => updateIdea(idea.id, { status: "ready" })}
+                                    className="h-12 w-full text-base"
+                                    onClick={() => updateIdea(idea.id, { status: "developing" })}
                                   >
-                                    Move to Scheduled →
+                                    ← Move to In Progress
                                   </Button>
-                                </>
-                              ) : null}
-
-                              {idea.status === "ready" ? (
-                                <Button
-                                  variant="outline"
-                                  className="h-12 w-full text-base sm:w-auto"
-                                  onClick={() => updateIdea(idea.id, { status: "developing" })}
-                                >
-                                  ← Move to In Progress
-                                </Button>
-                              ) : null}
+                                ) : null}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : null}
-                    </Surface>
-                  );
-                })
-              )}
+                        ) : null}
+                      </Surface>
+                    );
+                  })
+                )}
+              </div>
             </section>
           ))}
         </div>
