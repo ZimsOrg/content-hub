@@ -310,23 +310,61 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        const post = data.posts.find((p) => p.id === postId);
+
         setData((current) => ({
           ...current,
-          posts: current.posts.map((post) =>
-            post.id === postId
+          posts: current.posts.map((p) =>
+            p.id === postId
               ? {
-                  ...post,
+                  ...p,
                   comments: [
-                    ...post.comments,
+                    ...p.comments,
                     { id: uuidv4(), text: text.trim(), author, createdAt: new Date().toISOString() },
                   ],
                   updatedAt: new Date().toISOString(),
                 }
-              : post,
+              : p,
           ),
         }));
+
+        // Fire notification for Zima
+        if (author === "edo" && post) {
+          void fetch("/api/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "comment",
+              postId,
+              postTitle: post.title,
+              text: text.trim(),
+              author: "edo",
+            }),
+          }).catch(() => {});
+        }
       },
       setApprovalStatus: (postId, approvalStatus, comment) => {
+        const post = data.posts.find((p) => p.id === postId);
+
+        // Fire notification for Zima
+        if (post) {
+          const type = approvalStatus === "approved" ? "approval"
+            : approvalStatus === "rejected" ? "rejection"
+            : "revision";
+          void fetch("/api/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type,
+              postId,
+              postTitle: post.title,
+              text: comment?.trim() || undefined,
+              author: "edo",
+              status: approvalStatus,
+            }),
+          }).catch(() => {});
+        }
+
         setData((current) => ({
           ...current,
           posts: current.posts.map((post) => {
