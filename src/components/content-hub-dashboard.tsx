@@ -360,7 +360,7 @@ function StatCard({
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-semibold tracking-tight">{value}</div>
-        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
   );
@@ -1115,11 +1115,11 @@ function DraftsView() {
                   onClick={() => setActivePostId(expanded ? null : post.id)}
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-base font-semibold leading-6">{post.title}</p>
+                    <p className="truncate text-lg font-semibold leading-6">{post.title}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <PlatformBadge platform={post.platform} />
                       {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-base text-muted-foreground">
                         {format(parseISO(post.scheduledAt), "MMM d")}
                       </span>
                     </div>
@@ -1139,7 +1139,7 @@ function DraftsView() {
                 <div className="border-t border-border/40 px-4 py-4 sm:px-5">
                   <div className="space-y-5">
                     {post.approvalStatus ? (
-                      <div className={cn("rounded-2xl border px-4 py-3 text-sm font-medium", getApprovalTone(post.approvalStatus))}>
+                      <div className={cn("rounded-2xl border px-4 py-3 text-base font-medium", getApprovalTone(post.approvalStatus))}>
                         {APPROVAL_STATUS_META[post.approvalStatus]}
                       </div>
                     ) : null}
@@ -1149,13 +1149,13 @@ function DraftsView() {
                         <PostTypeBadge postType={post.postType} />
                         <StatusBadge value={post.status} />
                         {post.imageUrl ? (
-                          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 text-base text-muted-foreground">
                             <ImageIcon className="size-4" />
                             Image attached
                           </span>
                         ) : null}
                       </div>
-                      <pre className="font-sans whitespace-pre-wrap text-sm leading-6 text-foreground">
+                      <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
                         {post.content}
                       </pre>
                     </div>
@@ -1222,7 +1222,7 @@ function DraftsView() {
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium">Feedback thread</p>
+                        <p className="text-base font-medium">Feedback thread</p>
                         <span className="text-xs text-muted-foreground">
                           {post.comments.length} comments
                         </span>
@@ -1240,7 +1240,7 @@ function DraftsView() {
                                 </span>
                                 <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
                               </div>
-                              <p className="text-sm leading-6">{comment.text}</p>
+                              <p className="text-base leading-7">{comment.text}</p>
                             </div>
                           ))}
                         </div>
@@ -1360,13 +1360,13 @@ function AnalyticsView() {
 
       <Surface>
         <div className="mb-4">
-          <h3 className="text-lg font-semibold">Impressions Over Time</h3>
+          <h3 className="text-xl font-bold tracking-tight sm:text-lg sm:font-semibold">Impressions Over Time</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             LinkedIn and Substack growth from the analytics log.
           </p>
         </div>
 
-        <div className="h-80 w-full">
+        <div className="h-56 w-full sm:h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
@@ -1400,7 +1400,7 @@ function AnalyticsView() {
 
       <Surface>
         <div className="mb-4">
-          <h3 className="text-lg font-semibold">Posted Content</h3>
+          <h3 className="text-xl font-bold tracking-tight sm:text-lg sm:font-semibold">Posted Content</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Titles and the metrics that matter most.
           </p>
@@ -1418,8 +1418,8 @@ function AnalyticsView() {
                     <PlatformBadge platform={post.platform} />
                     <PostTypeBadge postType={post.postType} />
                   </div>
-                  <p className="mt-3 text-base font-medium leading-6">{post.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-3 text-lg font-semibold leading-6">{post.title}</p>
+                  <p className="mt-1 text-base text-muted-foreground">
                     {format(parseISO(post.scheduledAt), "MMM d, yyyy")}
                   </p>
                 </div>
@@ -1437,25 +1437,25 @@ function AnalyticsView() {
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                 <div>
                   <div className="text-muted-foreground">Impressions</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-xl font-semibold">
                     {safeNumber(post.metrics?.impressions).toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Comments</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-xl font-semibold">
                     {safeNumber(post.metrics?.comments).toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Reposts</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-xl font-semibold">
                     {safeNumber(post.metrics?.reposts).toLocaleString()}
                   </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Reactions</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-xl font-semibold">
                     {safeNumber(post.metrics?.reactions).toLocaleString()}
                   </div>
                 </div>
@@ -1680,7 +1680,7 @@ function SettingsView() {
             <CardTitle>Strategy Notes</CardTitle>
             <CardDescription>Reference snapshot for the current publishing system.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-base text-muted-foreground">
             <p>LinkedIn runs three times per week with sharper, shorter narrative posts.</p>
             <p>Substack alternates between free roundups and premium deep dives.</p>
             <p>Use the Drafts tab to capture reasons behind approval and rejection decisions.</p>
@@ -1778,10 +1778,10 @@ export function ContentHubDashboard() {
             </Sheet>
 
             <div>
-              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              <div className="text-sm uppercase tracking-[0.22em] text-muted-foreground">
                 {format(new Date(), "EEEE, MMMM d")}
               </div>
-              <h1 className="text-lg font-semibold tracking-tight sm:text-2xl">
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
                 {TAB_ITEMS.find((item) => item.id === activeTab)?.label}
               </h1>
             </div>
@@ -1806,13 +1806,13 @@ export function ContentHubDashboard() {
               <button
                 key={item.id}
                 className={cn(
-                  "flex min-h-11 flex-col items-center justify-center rounded-2xl px-1 py-2 text-[11px] font-medium transition",
+                  "flex min-h-11 flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-medium transition",
                   active ? "bg-foreground text-background" : "text-muted-foreground",
                 )}
                 onClick={() => setActiveTab(item.id)}
                 type="button"
               >
-                <Icon className="mb-1 size-5" />
+                <Icon className="mb-0.5 size-6" />
                 {item.label}
               </button>
             );
