@@ -687,8 +687,6 @@ function CalendarView() {
   const { data } = useContentHub();
   const [month, setMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [createOpen, setCreateOpen] = useState(false);
-
   const monthStart = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
   const monthEnd = addDays(startOfWeek(endOfMonth(month), { weekStartsOn: 0 }), 6);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -802,11 +800,6 @@ function CalendarView() {
           </CardContent>
         </Card>
 
-        <div className="md:hidden">
-          <Button className="fixed right-5 bottom-24 z-40 size-14 rounded-full shadow-xl" size="icon-lg">
-            <Plus />
-          </Button>
-        </div>
       </div>
 
       <Card className="border border-border/70 bg-card/80 backdrop-blur">
@@ -879,26 +872,8 @@ function CalendarView() {
           <span className="text-xs text-muted-foreground">
             Blue dots are LinkedIn. Orange dots are Substack.
           </span>
-          <Button variant="outline" onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Quick add
-          </Button>
         </CardFooter>
       </Card>
-
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Quick Add</DialogTitle>
-            <DialogDescription>
-              Capture new scheduled items from the Ideas tab where the full creation flow is available.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setCreateOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
