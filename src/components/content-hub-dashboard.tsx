@@ -1030,7 +1030,7 @@ function IdeasView() {
 }
 
 function DraftsView() {
-  const { data } = useContentHub();
+  const { data, setApprovalStatus } = useContentHub();
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<"edit" | "comment" | ApprovalStatus | null>(null);
 
@@ -1040,6 +1040,12 @@ function DraftsView() {
   const activePost = drafts.find((post) => post.id === activePostId) ?? null;
 
   function openDialog(postId: string, mode: "edit" | "comment" | ApprovalStatus) {
+    // For actions that don't require a comment, apply immediately
+    const config = APPROVAL_ACTIONS.find((a) => a.value === mode);
+    if (config && !config.requireComment) {
+      setApprovalStatus(postId, mode as Post["approvalStatus"]);
+      return;
+    }
     setActivePostId(postId);
     setDialogMode(mode);
   }
@@ -1100,6 +1106,23 @@ function DraftsView() {
               {expanded ? (
                 <>
                   <CardContent className="space-y-5">
+                    {post.approvalStatus && post.approvalStatus !== "pending" ? (
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium",
+                          post.approvalStatus === "approved" && "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+                          post.approvalStatus === "rejected" && "border border-red-500/30 bg-red-500/10 text-red-400",
+                          post.approvalStatus === "needs-revision" && "border border-amber-500/30 bg-amber-500/10 text-amber-400",
+                        )}
+                      >
+                        {post.approvalStatus === "approved" ? <Check className="size-4" /> : null}
+                        {post.approvalStatus === "rejected" ? <X className="size-4" /> : null}
+                        {post.approvalStatus === "needs-revision" ? <PencilLine className="size-4" /> : null}
+                        {post.approvalStatus === "approved" ? "Approved — ready to publish" : null}
+                        {post.approvalStatus === "rejected" ? "Rejected" : null}
+                        {post.approvalStatus === "needs-revision" ? "Needs revision" : null}
+                      </div>
+                    ) : null}
                     <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -1188,10 +1211,12 @@ function DraftsView() {
                     </div>
                   </CardContent>
                   <CardFooter className="flex flex-wrap gap-2">
-                    <Button onClick={() => openDialog(post.id, "approved")}>
-                      <Check />
-                      Approve
-                    </Button>
+                    {post.approvalStatus !== "approved" ? (
+                      <Button onClick={() => openDialog(post.id, "approved")}>
+                        <Check />
+                        Approve
+                      </Button>
+                    ) : null}
                     <Button variant="outline" onClick={() => openDialog(post.id, "edit")}>
                       <PencilLine />
                       Edit
@@ -1200,10 +1225,12 @@ function DraftsView() {
                       <MessageSquareText />
                       Comment
                     </Button>
-                    <Button variant="destructive" onClick={() => openDialog(post.id, "rejected")}>
-                      <X />
-                      Reject
-                    </Button>
+                    {post.approvalStatus !== "rejected" ? (
+                      <Button variant="destructive" onClick={() => openDialog(post.id, "rejected")}>
+                        <X />
+                        Reject
+                      </Button>
+                    ) : null}
                   </CardFooter>
                 </>
               ) : null}
