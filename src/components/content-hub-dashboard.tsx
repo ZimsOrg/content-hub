@@ -940,14 +940,14 @@ function IdeasView() {
           {columns.map((column) => (
             <section key={column.status} className="space-y-3">
               <div className={cn("flex items-center justify-between rounded-2xl border border-border/40 px-4 py-3", column.tone)}>
-                <h3 className="text-sm font-semibold tracking-tight">{column.title}</h3>
+                <h3 className="text-base font-semibold tracking-tight">{column.title}</h3>
                 <Badge variant="outline" className="min-w-8 justify-center rounded-full px-2.5 ring-1 ring-inset ring-border/40">
                   {column.ideas.length}
                 </Badge>
               </div>
 
               {column.ideas.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border/50 px-4 py-6 text-sm text-muted-foreground">
+                <div className="rounded-2xl border border-dashed border-border/50 px-4 py-6 text-base text-muted-foreground">
                   No ideas in this stage.
                 </div>
               ) : (
@@ -962,7 +962,7 @@ function IdeasView() {
                         onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
                       >
                         <div className="min-w-0">
-                          <p className="text-base font-semibold leading-6 sm:text-lg">{idea.title}</p>
+                          <p className="text-lg font-semibold leading-7">{idea.title}</p>
                           <div className="mt-3 flex flex-wrap gap-2">
                             <Badge
                               className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)}
@@ -980,7 +980,7 @@ function IdeasView() {
                         <div className="border-t border-border/40 px-4 py-4 sm:px-5">
                           <div className="space-y-4">
                             <div>
-                              <p className="text-sm leading-6 text-muted-foreground">
+                              <p className="text-base leading-7 text-muted-foreground">
                                 {idea.description || "No description yet."}
                               </p>
                             </div>
@@ -996,7 +996,7 @@ function IdeasView() {
                               </div>
                             ) : null}
 
-                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-2 text-base text-muted-foreground">
                               <StatusBadge value={idea.status} />
                               <PostTypeBadge postType={idea.postType} />
                               <span>Updated {format(parseISO(idea.updatedAt), "MMM d, yyyy")}</span>
@@ -1008,7 +1008,7 @@ function IdeasView() {
                                 Add to Calendar
                               </Button>
                             ) : (
-                              <div className="flex min-h-11 items-center text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                              <div className="flex min-h-11 items-center text-base font-medium text-emerald-700 dark:text-emerald-400">
                                 Scheduled ✓
                               </div>
                             )}
@@ -1017,7 +1017,7 @@ function IdeasView() {
                               {idea.status === "new" ? (
                                 <Button
                                   variant="outline"
-                                  className="h-11 w-full text-sm sm:w-auto"
+                                  className="h-12 w-full text-base sm:w-auto"
                                   onClick={() => updateIdea(idea.id, { status: "developing" })}
                                 >
                                   Move to In Progress →
@@ -1028,14 +1028,14 @@ function IdeasView() {
                                 <>
                                   <Button
                                     variant="outline"
-                                    className="h-11 w-full text-sm sm:w-auto"
+                                    className="h-12 w-full text-base sm:w-auto"
                                     onClick={() => updateIdea(idea.id, { status: "new" })}
                                   >
                                     ← Move to New
                                   </Button>
                                   <Button
                                     variant="outline"
-                                    className="h-11 w-full text-sm sm:w-auto"
+                                    className="h-12 w-full text-base sm:w-auto"
                                     onClick={() => updateIdea(idea.id, { status: "ready" })}
                                   >
                                     Move to Scheduled →
@@ -1046,7 +1046,7 @@ function IdeasView() {
                               {idea.status === "ready" ? (
                                 <Button
                                   variant="outline"
-                                  className="h-11 w-full text-sm sm:w-auto"
+                                  className="h-12 w-full text-base sm:w-auto"
                                   onClick={() => updateIdea(idea.id, { status: "developing" })}
                                 >
                                   ← Move to In Progress
