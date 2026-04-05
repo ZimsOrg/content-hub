@@ -312,9 +312,23 @@ function ImageViewerOverlay({ src, alt, onClose }: { src: string; alt: string; o
     }
   }
 
-  function handleTouchEnd() {
-    lastTouchRef.current = null;
-    if (scale <= 1.05) resetTransform();
+  function handleTouchEnd(event: React.TouchEvent) {
+    // Only reset tracking when ALL fingers are lifted
+    if (event.touches.length === 0) {
+      lastTouchRef.current = null;
+      // Only snap back if barely zoomed
+      if (scale < 1.15) resetTransform();
+    } else if (event.touches.length === 1 && scale > 1) {
+      // Went from pinch to pan — update the single-finger tracking
+      lastTouchRef.current = {
+        dist: 0,
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY,
+        scale,
+        tx: translate.x,
+        ty: translate.y,
+      };
+    }
   }
 
   function handleDoubleTap(event: React.TouchEvent) {
@@ -361,7 +375,7 @@ function ImageViewerOverlay({ src, alt, onClose }: { src: string; alt: string; o
         className="flex h-full w-full items-center justify-center overflow-hidden"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={(event) => { handleTouchEnd(); handleDoubleTap(event); }}
+        onTouchEnd={(event) => { handleTouchEnd(event); handleDoubleTap(event); }}
         style={{ touchAction: "none" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
