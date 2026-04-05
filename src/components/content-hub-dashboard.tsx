@@ -560,6 +560,7 @@ function DraftActionDialog({
   const { addComment, savePostContent, setApprovalStatus } = useContentHub();
   const [content, setContent] = useState(post?.content ?? "");
   const [comment, setComment] = useState("");
+  const [commentAuthor, setCommentAuthor] = useState<"edo" | "zima">("edo");
 
   useEffect(() => {
     setContent(post?.content ?? "");
@@ -599,7 +600,7 @@ function DraftActionDialog({
     }
 
     if (mode === "comment") {
-      addComment(post.id, comment, "zima");
+      addComment(post.id, comment, commentAuthor);
       close();
       return;
     }
@@ -626,16 +627,40 @@ function DraftActionDialog({
             onChange={(event) => setContent(event.target.value)}
           />
         ) : (
-          <Textarea
-            className="min-h-36"
-            placeholder={
-              config?.requireComment
-                ? "Explain the rejection or revision request"
-                : "Leave a note for the draft thread"
-            }
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-          />
+          <div className="space-y-3">
+            {mode === "comment" ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">Commenting as</span>
+                <div className="inline-flex rounded-xl border border-border/70 bg-muted/30 p-0.5">
+                  {(["edo", "zima"] as const).map((author) => (
+                    <button
+                      key={author}
+                      type="button"
+                      className={cn(
+                        "rounded-[10px] px-3 py-1 text-xs font-medium transition",
+                        commentAuthor === author
+                          ? "bg-foreground text-background shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => setCommentAuthor(author)}
+                    >
+                      {author === "edo" ? "Edo" : "Zima"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <Textarea
+              className="min-h-36"
+              placeholder={
+                config?.requireComment
+                  ? "Explain the rejection or revision request"
+                  : "Leave a note for the draft thread"
+              }
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+            />
+          </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={close}>
@@ -1116,10 +1141,17 @@ function DraftsView() {
                           post.comments.map((comment) => (
                             <div
                               key={comment.id}
-                              className="rounded-2xl border border-border/70 bg-muted/30 p-3"
+                              className={cn(
+                                "rounded-2xl border p-3",
+                                comment.author === "edo"
+                                  ? "border-blue-500/30 bg-blue-500/5"
+                                  : "border-border/70 bg-muted/30",
+                              )}
                             >
                               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                <span>{comment.author}</span>
+                                <span className="font-medium">
+                                  {comment.author === "edo" ? "Edo" : "Zima"}
+                                </span>
                                 <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
                               </div>
                               <p className="mt-2 text-sm leading-6">{comment.text}</p>
