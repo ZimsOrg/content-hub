@@ -1565,8 +1565,7 @@ function SettingsView() {
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <div className="space-y-5">
+    <div className="space-y-5">
         <Card className="border border-border/40 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle>Theme</CardTitle>
@@ -1624,38 +1623,6 @@ function SettingsView() {
             ))}
           </CardContent>
         </Card>
-      </div>
-
-      <div className="space-y-5">
-        <Card className="border border-border/40 bg-card/80 backdrop-blur">
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>Stored for future reminder workflows.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant={data.settings.notificationsEnabled ? "default" : "outline"}
-              className="h-11 px-4"
-              onClick={() => setNotificationsEnabled(!data.settings.notificationsEnabled)}
-            >
-              <Bell />
-              {data.settings.notificationsEnabled ? "Enabled" : "Disabled"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-border/40 bg-card/80 backdrop-blur">
-          <CardHeader>
-            <CardTitle>Strategy Notes</CardTitle>
-            <CardDescription>Reference snapshot for the current publishing system.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-base text-muted-foreground">
-            <p>LinkedIn runs three times per week with sharper, shorter narrative posts.</p>
-            <p>Substack alternates between free roundups and premium deep dives.</p>
-            <p>Use the Drafts tab to capture reasons behind approval and rejection decisions.</p>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
