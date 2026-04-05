@@ -747,16 +747,14 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
 
               {post.imageUrl ? (
                 <div className="mt-4 space-y-3">
-                  <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
-                    <Image
+                  <a href={post.imageUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       src={post.imageUrl}
-                      alt={`Attached image for ${post.title}`}
-                      width={1600}
-                      height={900}
-                      sizes="(max-width: 1024px) 100vw, 320px"
+                      alt={`Image for ${post.title} — long press to save`}
                       className="h-auto w-full object-cover"
                     />
-                  </div>
+                  </a>
                   <Button
                     variant="outline"
                     className="h-12 w-full text-base border-border/40"
