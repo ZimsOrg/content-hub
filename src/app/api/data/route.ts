@@ -158,8 +158,9 @@ export async function GET() {
     return Response.json(data);
   } catch (error) {
     console.error("GET /api/data error:", error);
+    const message = error instanceof Error ? error.message : String(error);
     return Response.json(
-      { error: "Failed to load content hub data." },
+      { error: "Failed to load content hub data.", detail: message },
       { status: 500 },
     );
   }
