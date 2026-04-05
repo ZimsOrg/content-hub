@@ -725,7 +725,6 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-xl font-bold tracking-tight">{formatDayLabel(date)}</h3>
-          <p className="text-sm text-muted-foreground">Selected day agenda</p>
         </div>
         <Badge
           variant="outline"
@@ -807,9 +806,6 @@ function CalendarView() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-2xl font-bold tracking-tight lg:text-xl">{format(month, "MMMM yyyy")}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pick a day to see that day&apos;s agenda.
-            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -829,17 +825,6 @@ function CalendarView() {
               <ChevronRight />
             </Button>
           </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-2">
-            <span className="size-2 rounded-full" style={{ backgroundColor: LINKEDIN_COLOR }} />
-            LinkedIn
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="size-2 rounded-full" style={{ backgroundColor: SUBSTACK_COLOR }} />
-            Substack
-          </span>
         </div>
 
         <div className="mt-4 grid grid-cols-7 gap-1 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground sm:gap-2 sm:text-sm">
@@ -1361,9 +1346,6 @@ function AnalyticsView() {
       <Surface>
         <div className="mb-4">
           <h3 className="text-xl font-bold tracking-tight sm:text-lg sm:font-semibold">Impressions Over Time</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            LinkedIn and Substack growth from the analytics log.
-          </p>
         </div>
 
         <div className="h-56 w-full sm:h-80">
@@ -1401,9 +1383,6 @@ function AnalyticsView() {
       <Surface>
         <div className="mb-4">
           <h3 className="text-xl font-bold tracking-tight sm:text-lg sm:font-semibold">Posted Content</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Titles and the metrics that matter most.
-          </p>
         </div>
 
         <div className="space-y-3">
@@ -1746,7 +1725,6 @@ export function ContentHubDashboard() {
               <SheetContent side="left" className="w-[88vw] max-w-sm border-r border-border/40">
                 <SheetHeader>
                   <SheetTitle>Content Hub</SheetTitle>
-                  <SheetDescription>Navigate between the five dashboard views.</SheetDescription>
                 </SheetHeader>
                 <div className="space-y-2 p-4 pt-0">
                   {TAB_ITEMS.map((item) => {
