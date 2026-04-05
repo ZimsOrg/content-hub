@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition, type ChangeEvent } from "react";
 import {
   addDays,
@@ -760,7 +761,23 @@ function CalendarView() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="line-clamp-4 text-sm text-muted-foreground">{post.content}</p>
+                  {post.imageUrl ? (
+                    <div className="mb-3 flex items-start gap-3">
+                      <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted/30">
+                        <Image
+                          src={post.imageUrl}
+                          alt={`Thumbnail for ${post.title}`}
+                          fill
+                          sizes="80px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <p className="line-clamp-4 text-sm text-muted-foreground">{post.content}</p>
+                    </div>
+                  ) : null}
+                  {!post.imageUrl ? (
+                    <p className="line-clamp-4 text-sm text-muted-foreground">{post.content}</p>
+                  ) : null}
                 </CardContent>
               </Card>
             ))
@@ -972,6 +989,23 @@ function DraftsView() {
                 <>
                   <CardContent className="space-y-5">
                     <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                      {post.imageUrl ? (
+                        <div className="mb-4 space-y-2">
+                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                            Attached Image
+                          </p>
+                          <div className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20">
+                            <Image
+                              src={post.imageUrl}
+                              alt={`Attached image for ${post.title}`}
+                              width={1600}
+                              height={900}
+                              sizes="(max-width: 768px) 100vw, 720px"
+                              className="h-auto max-h-[28rem] w-full object-cover md:max-w-3xl"
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                       <pre className="font-sans whitespace-pre-wrap text-sm leading-6 text-foreground">
                         {post.content}
                       </pre>

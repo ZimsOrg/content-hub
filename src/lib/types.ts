@@ -66,6 +66,7 @@ export interface Post {
   ideaId?: string;
   title: string;
   content: string;
+  imageUrl?: string;
   platform: PostPlatform;
   postType: PostType;
   scheduledAt: string;

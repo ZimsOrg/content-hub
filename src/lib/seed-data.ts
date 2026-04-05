@@ -81,6 +81,7 @@ const seedPosts: Post[] = [
     title: "Yann LeCun just raised $1.03 billion to prove LLMs are a dead end",
     content:
       "The interesting part is not the headline. It is that the market is now funding alternatives to the current interface layer, not just incremental model scale.\n\nThat is the real signal creators and operators should watch.",
+    imageUrl: "/images/batch-1/copilot-infographic-chatgpt.png",
     platform: "linkedin",
     postType: "contrarian",
     status: "posted",
@@ -178,6 +179,7 @@ const seedPosts: Post[] = [
     title: "My actual Claude Code setup + config",
     content:
       "## What changed\nI stopped treating Claude Code like a chatbot and started treating it like a command surface.\n\n## Stack\n- MCP server for Slack context\n- Standard project memory notes\n- Tight review loop for patches\n\n## Why it works\nThe system is boring, repeatable, and reduces context loss.",
+    imageUrl: "/images/batch-1/copilot-map-cropped.png",
     platform: "substack",
     postType: "paid-deep-dive",
     status: "review",
@@ -207,6 +209,7 @@ const seedPosts: Post[] = [
     title: "Your content engine is a product surface, not a side project",
     content:
       "Founders who treat content as a side channel underinvest in process. The result is inconsistent output and weak signal capture.",
+    imageUrl: "/images/batch-1/codex-terminal-cropped.png",
     platform: "linkedin",
     postType: "trenches",
     status: "draft",
