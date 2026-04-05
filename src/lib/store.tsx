@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useMemo,
   useState,
   type ReactNode,
@@ -22,8 +23,6 @@ import type {
   PostType,
   ThemePreference,
 } from "@/lib/types";
-
-const STORAGE_KEY = "content-hub-dashboard-v1";
 
 type NewIdeaInput = Pick<
   Idea,
@@ -78,24 +77,21 @@ function getDefaultData(): ContentHubData {
   return structuredClone(seedContentHubData);
 }
 
-function parseStoredData(value: string | null): ContentHubData {
-  if (!value) {
-    return getDefaultData();
-  }
+function normalizeData(value: ContentHubData): ContentHubData {
+  const defaultData = getDefaultData();
 
-  try {
-    const parsed = JSON.parse(value) as ContentHubData;
-    return {
-      ...getDefaultData(),
-      ...parsed,
-      settings: {
-        ...getDefaultData().settings,
-        ...parsed.settings,
+  return {
+    ...defaultData,
+    ...value,
+    settings: {
+      ...defaultData.settings,
+      ...value.settings,
+      postingSchedule: {
+        ...defaultData.settings.postingSchedule,
+        ...value.settings?.postingSchedule,
       },
-    };
-  } catch {
-    return getDefaultData();
-  }
+    },
+  };
 }
 
 function applyTheme(theme: ThemePreference) {
@@ -110,21 +106,76 @@ function applyTheme(theme: ThemePreference) {
 export function ContentHubProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<ContentHubData>(getDefaultData);
   const [isReady, setIsReady] = useState(false);
+  const hasLoadedRef = useRef(false);
+  const hasInitializedPersistenceRef = useRef(false);
 
   useEffect(() => {
-    const nextData = parseStoredData(window.localStorage.getItem(STORAGE_KEY));
-    setData(nextData);
-    applyTheme(nextData.settings.theme);
-    setIsReady(true);
+    const abortController = new AbortController();
+
+    async function loadData() {
+      try {
+        const response = await fetch("/api/data", { signal: abortController.signal });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load data: ${response.status}`);
+        }
+
+        const nextData = normalizeData((await response.json()) as ContentHubData);
+
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        hasLoadedRef.current = true;
+        setData(nextData);
+        applyTheme(nextData.settings.theme);
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        console.error("Failed to fetch content hub data:", error);
+        const fallbackData = getDefaultData();
+        hasLoadedRef.current = true;
+        setData(fallbackData);
+        applyTheme(fallbackData.settings.theme);
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsReady(true);
+        }
+      }
+    }
+
+    void loadData();
+
+    return () => abortController.abort();
   }, []);
 
   useEffect(() => {
-    if (!isReady) {
+    if (!isReady || !hasLoadedRef.current) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     applyTheme(data.settings.theme);
+
+    if (!hasInitializedPersistenceRef.current) {
+      hasInitializedPersistenceRef.current = true;
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void fetch("/api/data", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      }).catch((error: unknown) => {
+        console.error("Failed to save content hub data:", error);
+      });
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
   }, [data, isReady]);
 
   useEffect(() => {
@@ -372,7 +423,7 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
         }));
       },
       importData: (nextData) => {
-        setData(nextData);
+        setData(normalizeData(nextData));
       },
       exportData: () => JSON.stringify(data, null, 2),
     };
