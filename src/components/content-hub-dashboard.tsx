@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
+import { useEffect, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
 import {
   addDays,
   addMonths,
@@ -23,16 +23,16 @@ import {
   Bell,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
   Clock3,
   Copy,
   Download,
-  FilePenLine,
-  ImageIcon,
   FileText,
   Flame,
+  ImageIcon,
   Lightbulb,
   Link2,
   LoaderCircle,
@@ -42,7 +42,6 @@ import {
   PanelLeft,
   PencilLine,
   Plus,
-  Search,
   Send,
   Settings2,
   Sparkles,
@@ -80,27 +79,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useContentHub } from "@/lib/store";
 import type {
@@ -148,10 +128,7 @@ const PLATFORM_META = {
   },
 } as const;
 
-const POST_TYPE_META: Record<
-  PostType,
-  { label: string; dot: string; badge: string }
-> = {
+const POST_TYPE_META: Record<PostType, { label: string; dot: string; badge: string }> = {
   trenches: {
     label: "Trenches",
     dot: "bg-emerald-500",
@@ -182,17 +159,14 @@ const POST_TYPE_META: Record<
 const PRIORITY_META = {
   high: {
     label: "High",
-    border: "border-l-4 border-l-rose-500",
     badge: "bg-rose-500/12 text-rose-700 ring-rose-500/20 dark:text-rose-300",
   },
   medium: {
     label: "Medium",
-    border: "border-l-4 border-l-amber-500",
     badge: "bg-amber-500/12 text-amber-700 ring-amber-500/20 dark:text-amber-300",
   },
   low: {
     label: "Low",
-    border: "border-l-4 border-l-emerald-500",
     badge: "bg-emerald-500/12 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300",
   },
 } as const;
@@ -273,8 +247,7 @@ function postMatchesDate(post: Post, date: Date) {
 
 function sortPostsByDate(posts: Post[]) {
   return [...posts].sort(
-    (left, right) =>
-      parseISO(left.scheduledAt).getTime() - parseISO(right.scheduledAt).getTime(),
+    (left, right) => parseISO(left.scheduledAt).getTime() - parseISO(right.scheduledAt).getTime(),
   );
 }
 
@@ -288,6 +261,38 @@ function sortIdeasByPriority(ideas: Idea[]) {
 
     return parseISO(right.updatedAt).getTime() - parseISO(left.updatedAt).getTime();
   });
+}
+
+function getApprovalTone(status: ApprovalStatus | undefined) {
+  switch (status) {
+    case "approved":
+      return "border-emerald-500/20 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300";
+    case "rejected":
+      return "border-red-500/20 bg-red-500/8 text-red-700 dark:text-red-300";
+    case "needs-revision":
+      return "border-amber-500/20 bg-amber-500/8 text-amber-700 dark:text-amber-300";
+    default:
+      return "border-border/40 bg-muted/40 text-muted-foreground";
+  }
+}
+
+function Surface({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-3xl border border-border/40 bg-card/80 p-4 shadow-sm backdrop-blur sm:p-5",
+        className,
+      )}
+    >
+      {children}
+    </section>
+  );
 }
 
 type CopyPostButtonProps = {
@@ -323,7 +328,7 @@ function CopyPostButton({
   return (
     <Button
       variant="outline"
-      className={cn("h-11 min-w-11", compact ? "w-11 rounded-xl p-0" : "px-4", className)}
+      className={cn("h-11 min-w-11 border-border/40", compact ? "w-11 rounded-xl p-0" : "px-4", className)}
       onClick={handleCopy}
       aria-label={copied ? "Copied!" : label}
       title={copied ? "Copied!" : label}
@@ -346,9 +351,9 @@ function StatCard({
   icon: typeof TrendingUp;
 }) {
   return (
-    <Card className="min-w-[14rem] border border-border/60 bg-card/80 backdrop-blur">
+    <Card className="border border-border/40 bg-card/80 shadow-none">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <CardDescription>{label}</CardDescription>
           <Icon className="size-4 text-muted-foreground" />
         </div>
@@ -394,7 +399,7 @@ function StatusBadge({
     APPROVAL_STATUS_META[value as keyof typeof APPROVAL_STATUS_META];
 
   return (
-    <Badge className="ring-1 ring-inset ring-border/60" variant="outline">
+    <Badge className="ring-1 ring-inset ring-border/40" variant="outline">
       {label}
     </Badge>
   );
@@ -410,17 +415,17 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <Card className="border border-dashed border-border/70 bg-card/60">
-      <CardContent className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+    <Surface className="border-dashed">
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
         <div className="rounded-full bg-muted p-3">
           <Icon className="size-5 text-muted-foreground" />
         </div>
         <div className="space-y-1">
-          <p className="font-medium">{title}</p>
+          <p className="text-base font-medium">{title}</p>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Surface>
   );
 }
 
@@ -487,7 +492,7 @@ function ScheduleIdeaDialog({
         </DialogHeader>
         {idea ? (
           <div className="space-y-5">
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
+            <div className="rounded-2xl border border-border/40 bg-muted/30 p-4">
               <p className="font-medium">{idea.title}</p>
               {idea.description ? (
                 <p className="mt-1 text-sm text-muted-foreground">{idea.description}</p>
@@ -526,13 +531,13 @@ function ScheduleIdeaDialog({
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Platform
               </label>
-              <div className="inline-flex rounded-xl border border-border/70 bg-muted/30 p-0.5">
+              <div className="inline-flex rounded-xl border border-border/40 bg-muted/30 p-0.5">
                 {availablePlatforms.map((platform) => (
                   <button
                     key={platform}
                     type="button"
                     className={cn(
-                      "rounded-[10px] px-4 py-2 text-sm font-medium transition",
+                      "min-h-11 rounded-[10px] px-4 py-2 text-sm font-medium transition",
                       selectedPlatform === platform
                         ? "bg-foreground text-background shadow-sm"
                         : "text-muted-foreground hover:text-foreground",
@@ -546,7 +551,7 @@ function ScheduleIdeaDialog({
             </div>
 
             {selectedDate ? (
-              <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+              <div className="rounded-2xl border border-border/40 bg-muted/20 px-4 py-3">
                 <p className="text-sm text-muted-foreground">
                   Publishing on{" "}
                   <span className="font-medium text-foreground">
@@ -662,13 +667,13 @@ function DraftActionDialog({
             {mode === "comment" ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Commenting as</span>
-                <div className="inline-flex rounded-xl border border-border/70 bg-muted/30 p-0.5">
+                <div className="inline-flex rounded-xl border border-border/40 bg-muted/30 p-0.5">
                   {(["edo", "zima"] as const).map((author) => (
                     <button
                       key={author}
                       type="button"
                       className={cn(
-                        "rounded-[10px] px-3 py-1 text-xs font-medium transition",
+                        "min-h-11 rounded-[10px] px-3 py-1 text-xs font-medium transition",
                         commentAuthor === author
                           ? "bg-foreground text-background shadow-sm"
                           : "text-muted-foreground hover:text-foreground",
@@ -714,6 +719,71 @@ function DraftActionDialog({
   );
 }
 
+function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
+  return (
+    <Surface className="h-full">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">{formatDayLabel(date)}</h3>
+          <p className="text-sm text-muted-foreground">Selected day agenda</p>
+        </div>
+        <Badge variant="outline" className="ring-1 ring-inset ring-border/40">
+          {posts.length} scheduled
+        </Badge>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {posts.length === 0 ? (
+          <EmptyState
+            icon={CalendarDays}
+            title="No scheduled content"
+            description="Choose another day or add an idea from the Ideas tab."
+          />
+        ) : (
+          posts.map((post) => (
+            <div
+              key={post.id}
+              className="rounded-2xl border border-border/40 bg-background/60 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <PlatformBadge platform={post.platform} />
+                    <PostTypeBadge postType={post.postType} />
+                    <StatusBadge value={post.status} />
+                  </div>
+                  <p className="text-base font-medium leading-6">{post.title}</p>
+                </div>
+                <CopyPostButton content={post.content} label={`Copy ${post.title} text`} compact />
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock3 className="size-4" />
+                {format(parseISO(post.scheduledAt), "p")}
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{post.content}</p>
+
+              {post.imageUrl ? (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                  <Image
+                    src={post.imageUrl}
+                    alt={`Attached image for ${post.title}`}
+                    width={1600}
+                    height={900}
+                    sizes="(max-width: 1024px) 100vw, 320px"
+                    className="h-auto w-full object-cover"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))
+        )}
+      </div>
+    </Surface>
+  );
+}
+
 function CalendarView() {
   const { data } = useContentHub();
   const [month, setMonth] = useState(startOfMonth(new Date()));
@@ -722,299 +792,204 @@ function CalendarView() {
   const monthEnd = addDays(startOfWeek(endOfMonth(month), { weekStartsOn: 0 }), 6);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const agenda = sortPostsByDate(data.posts.filter((post) => postMatchesDate(post, selectedDate)));
-  const handleMonthChange = (nextMonth: Date) => {
+
+  function handleMonthChange(nextMonth: Date) {
     setMonth(nextMonth);
     setSelectedDate(startOfMonth(nextMonth));
-  };
+  }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-      <div className="space-y-4">
-        <Card className="border border-border/70 bg-card/80 shadow-[0_20px_60px_-40px_rgba(0,0,0,0.45)] backdrop-blur">
-          <CardHeader className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-xl">{format(month, "MMMM yyyy")}</CardTitle>
-                <CardDescription>
-                  Click any day to inspect the posting agenda and cadence.
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handleMonthChange(subMonths(month, 1))}
-                >
-                  <ChevronLeft />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handleMonthChange(addMonths(month, 1))}
-                >
-                  <ChevronRight />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-7 gap-1 pb-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground md:gap-2 md:px-0 md:text-xs md:tracking-[0.2em]">
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <div key={day} className="px-1 text-center md:px-3 md:text-left">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1 md:gap-2">
-              {days.map((date) => {
-                const posts = sortPostsByDate(data.posts.filter((post) => postMatchesDate(post, date)));
-                const isActive = isSameDay(date, selectedDate);
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <Surface>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold">{format(month, "MMMM yyyy")}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pick a day to see that day&apos;s agenda.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon-lg"
+              className="border-border/40"
+              onClick={() => handleMonthChange(subMonths(month, 1))}
+            >
+              <ChevronLeft />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-lg"
+              className="border-border/40"
+              onClick={() => handleMonthChange(addMonths(month, 1))}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+        </div>
 
-                return (
-                  <button
-                    key={date.toISOString()}
-                    className={cn(
-                      "min-h-20 rounded-2xl border p-2 text-left transition md:min-h-28 md:rounded-3xl md:p-3",
-                      isActive
-                        ? "border-foreground/15 bg-foreground/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                        : "border-border/70 bg-background/75 hover:bg-muted/40",
-                      !isSameMonth(date, month) && "opacity-45",
-                    )}
-                    onClick={() => setSelectedDate(date)}
-                    type="button"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={cn(
-                          "flex size-7 items-center justify-center rounded-full text-xs font-medium md:size-8 md:text-sm",
-                          isToday(date) && "bg-foreground text-background",
-                        )}
-                      >
-                        {format(date, "d")}
-                      </span>
-                      <div className="hidden gap-1 md:flex">
-                        {posts.slice(0, 2).map((post) => (
-                          <span
-                            key={post.id}
-                            className="size-2 rounded-full"
-                            style={{ backgroundColor: getPlatformColor(post.platform) }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1 md:hidden">
-                      {posts.slice(0, 4).map((post) => (
-                        <span
-                          key={post.id}
-                          className="size-1.5 rounded-full"
-                          style={{ backgroundColor: getPlatformColor(post.platform) }}
-                        />
-                      ))}
-                    </div>
-                    <div className="mt-4 hidden space-y-1.5 md:block">
-                      {posts.slice(0, 2).map((post) => (
-                        <div
-                          key={post.id}
-                          className="truncate rounded-xl px-2 py-1 text-xs text-foreground"
-                          style={{
-                            backgroundColor: `${getPlatformColor(post.platform)}18`,
-                          }}
-                        >
-                          {post.title}
-                        </div>
-                      ))}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-      </div>
-
-      <Card className="border border-border/70 bg-card/80 backdrop-blur">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between gap-2">
-            <span>{formatDayLabel(selectedDate)}</span>
-            <Badge variant="outline" className="ring-1 ring-inset ring-border/60">
-              {agenda.length} scheduled
-            </Badge>
-          </CardTitle>
-          <CardDescription>Agenda view for the selected day.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {agenda.length === 0 ? (
-            <EmptyState
-              icon={CalendarDays}
-              title="No scheduled content"
-              description="Choose another day or add an idea from the Ideas tab."
-            />
-          ) : (
-            agenda.map((post) => (
-              <Card key={post.id} size="sm" className="border border-border/70 bg-background/70">
-                <CardHeader className="pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        <PlatformBadge platform={post.platform} />
-                        <PostTypeBadge postType={post.postType} />
-                        <StatusBadge value={post.status} />
-                      </div>
-                      <CardTitle>{post.title}</CardTitle>
-                    </div>
-                    <div className="flex shrink-0 items-start gap-2">
-                      <CopyPostButton
-                        content={post.content}
-                        label={`Copy ${post.title} text`}
-                        compact
-                      />
-                      <div className="flex h-11 items-center gap-1 text-xs text-muted-foreground">
-                        <Clock3 className="size-3.5" />
-                        {format(parseISO(post.scheduledAt), "p")}
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {post.imageUrl ? (
-                    <div className="mb-3 flex items-start gap-3">
-                      <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted/30">
-                        <Image
-                          src={post.imageUrl}
-                          alt={`Thumbnail for ${post.title}`}
-                          fill
-                          sizes="80px"
-                          className="object-cover"
-                        />
-                      </div>
-                      <p className="line-clamp-4 text-sm text-muted-foreground">{post.content}</p>
-                    </div>
-                  ) : null}
-                  {!post.imageUrl ? (
-                    <p className="line-clamp-4 text-sm text-muted-foreground">{post.content}</p>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </CardContent>
-        <CardFooter className="justify-between">
-          <span className="text-xs text-muted-foreground">
-            Blue dots are LinkedIn. Orange dots are Substack.
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-2">
+            <span className="size-2 rounded-full" style={{ backgroundColor: LINKEDIN_COLOR }} />
+            LinkedIn
           </span>
-        </CardFooter>
-      </Card>
+          <span className="inline-flex items-center gap-2">
+            <span className="size-2 rounded-full" style={{ backgroundColor: SUBSTACK_COLOR }} />
+            Substack
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-7 gap-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground sm:gap-2 sm:text-xs">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <div key={day} className="px-1 pb-2 text-center">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          {days.map((date) => {
+            const posts = sortPostsByDate(data.posts.filter((post) => postMatchesDate(post, date)));
+            const isActive = isSameDay(date, selectedDate);
+
+            return (
+              <button
+                key={date.toISOString()}
+                type="button"
+                className={cn(
+                  "min-h-20 rounded-2xl border p-2 text-left transition sm:min-h-24",
+                  isActive
+                    ? "border-foreground/15 bg-foreground/[0.045]"
+                    : "border-border/40 bg-background/70 hover:bg-muted/40",
+                  !isSameMonth(date, month) && "opacity-45",
+                )}
+                onClick={() => setSelectedDate(date)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={cn(
+                      "flex size-7 items-center justify-center rounded-full text-sm font-medium",
+                      isToday(date) && "bg-foreground text-background",
+                    )}
+                  >
+                    {format(date, "d")}
+                  </span>
+                  <div className="flex gap-1">
+                    {posts.slice(0, 3).map((post) => (
+                      <span
+                        key={post.id}
+                        className="size-1.5 rounded-full"
+                        style={{ backgroundColor: getPlatformColor(post.platform) }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 hidden space-y-1 text-xs sm:block">
+                  {posts.slice(0, 2).map((post) => (
+                    <div
+                      key={post.id}
+                      className="truncate rounded-xl px-2 py-1"
+                      style={{ backgroundColor: `${getPlatformColor(post.platform)}18` }}
+                    >
+                      {post.title}
+                    </div>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Surface>
+
+      <div className="lg:hidden">
+        <CalendarAgenda date={selectedDate} posts={agenda} />
+      </div>
+      <div className="hidden lg:block">
+        <CalendarAgenda date={selectedDate} posts={agenda} />
+      </div>
     </div>
   );
 }
 
 function IdeasView() {
   const { data } = useContentHub();
-  const [query, setQuery] = useState("");
+  const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
 
-  const ideas = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return sortIdeasByPriority(
-      data.ideas.filter((idea) => {
-        if (!normalizedQuery) {
-          return true;
-        }
-
-        return [idea.title, idea.description, idea.tags?.join(" ")]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedQuery);
-      }),
-    );
-  }, [data.ideas, query]);
+  const ideas = sortIdeasByPriority(data.ideas);
 
   return (
-    <div className="space-y-5">
-      <Card className="border border-border/70 bg-card/80 backdrop-blur">
-        <CardHeader className="gap-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <CardTitle className="text-xl">Ideas Bank</CardTitle>
-              <CardDescription>
-                Search, sort, and push promising ideas onto the content calendar.
-              </CardDescription>
-            </div>
-            <div className="relative w-full max-w-md">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="h-11 rounded-2xl pl-10"
-                placeholder="Search ideas, tags, or notes"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+    <div className="space-y-3">
+      {ideas.length === 0 ? (
+        <EmptyState
+          icon={Lightbulb}
+          title="No ideas yet"
+          description="Capture new ideas to build the next publishing run."
+        />
+      ) : (
+        ideas.map((idea) => {
+          const expanded = expandedIdeaId === idea.id;
 
-      <div className="grid gap-4">
-        {ideas.length === 0 ? (
-          <EmptyState
-            icon={Lightbulb}
-            title="No matching ideas"
-            description="Adjust the search terms to surface more of the backlog."
-          />
-        ) : (
-          ideas.map((idea) => (
-            <Card
-              key={idea.id}
-              className={cn(
-                "border border-border/70 bg-card/80 backdrop-blur",
-                PRIORITY_META[idea.priority].border,
-              )}
-            >
-              <CardHeader>
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge
-                        className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)}
-                        variant="outline"
-                      >
-                        {PRIORITY_META[idea.priority].label}
-                      </Badge>
-                      <PlatformBadge platform={idea.platform} />
-                      <PostTypeBadge postType={idea.postType} />
-                      <StatusBadge value={idea.status} />
-                    </div>
-                    <div>
-                      <CardTitle>{idea.title}</CardTitle>
-                      <CardDescription className="mt-2 max-w-3xl leading-6">
-                        {idea.description}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <Button className="h-11 px-4" onClick={() => setSelectedIdea(idea)}>
-                    <Plus />
-                    Add to Calendar
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardFooter className="flex flex-wrap justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {(idea.tags ?? []).map((tag) => (
-                    <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/60">
-                      <Link2 />
-                      {tag}
+          return (
+            <Surface key={idea.id} className="p-0">
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 p-4 text-left sm:p-5"
+                onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
+              >
+                <div className="min-w-0">
+                  <p className="text-base font-semibold leading-6">{idea.title}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge
+                      className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)}
+                      variant="outline"
+                    >
+                      {PRIORITY_META[idea.priority].label}
                     </Badge>
-                  ))}
+                    <StatusBadge value={idea.status} />
+                    <PlatformBadge platform={idea.platform} />
+                  </div>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  Updated {format(parseISO(idea.updatedAt), "MMM d, yyyy")}
-                </span>
-              </CardFooter>
-            </Card>
-          ))
-        )}
-      </div>
+                <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
+              </button>
+
+              {expanded ? (
+                <div className="border-t border-border/40 px-4 py-4 sm:px-5">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {idea.description || "No description yet."}
+                      </p>
+                    </div>
+
+                    {(idea.tags ?? []).length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {(idea.tags ?? []).map((tag) => (
+                          <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
+                            <Link2 />
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <PostTypeBadge postType={idea.postType} />
+                      <span>Updated {format(parseISO(idea.updatedAt), "MMM d, yyyy")}</span>
+                    </div>
+
+                    <Button className="h-11 w-full sm:w-auto" onClick={() => setSelectedIdea(idea)}>
+                      <Plus />
+                      Add to Calendar
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </Surface>
+          );
+        })
+      )}
 
       <ScheduleIdeaDialog
         idea={selectedIdea}
@@ -1040,18 +1015,18 @@ function DraftsView() {
   const activePost = drafts.find((post) => post.id === activePostId) ?? null;
 
   function openDialog(postId: string, mode: "edit" | "comment" | ApprovalStatus) {
-    // For actions that don't require a comment, apply immediately
-    const config = APPROVAL_ACTIONS.find((a) => a.value === mode);
+    const config = APPROVAL_ACTIONS.find((action) => action.value === mode);
     if (config && !config.requireComment) {
       setApprovalStatus(postId, mode as Post["approvalStatus"]);
       return;
     }
+
     setActivePostId(postId);
     setDialogMode(mode);
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {drafts.length === 0 ? (
         <EmptyState
           icon={FileText}
@@ -1063,178 +1038,149 @@ function DraftsView() {
           const expanded = activePostId === post.id;
 
           return (
-            <Card key={post.id} className="border border-border/70 bg-card/80 backdrop-blur">
-              <CardHeader>
-                <div className="flex items-start gap-3">
-                  <button
-                    className="flex min-w-0 flex-1 items-start justify-between gap-4 text-left"
-                    onClick={() => setActivePostId(expanded ? null : post.id)}
-                    type="button"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap gap-2">
-                        <PlatformBadge platform={post.platform} />
-                        <PostTypeBadge postType={post.postType} />
-                        <StatusBadge value={post.status} />
-                        {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
-                      </div>
-                      <div>
-                        <CardTitle>{post.title}</CardTitle>
-                        <CardDescription className="mt-2 flex flex-wrap items-center gap-3">
-                          <span>{format(parseISO(post.scheduledAt), "EEE, MMM d 'at' p")}</span>
-                          <span>{post.comments.length} comments</span>
-                          <span>{post.revisions.length} revisions</span>
-                          {post.imageUrl ? (
-                            <span className="inline-flex items-center gap-1 text-muted-foreground">
-                              <ImageIcon className="size-3.5" />
-                              Image
-                            </span>
-                          ) : null}
-                        </CardDescription>
-                      </div>
+            <Surface key={post.id} className="p-0">
+              <div className="flex items-start gap-3 p-4 sm:p-5">
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
+                  onClick={() => setActivePostId(expanded ? null : post.id)}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold leading-6">{post.title}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <PlatformBadge platform={post.platform} />
+                      {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
+                      <span className="text-sm text-muted-foreground">
+                        {format(parseISO(post.scheduledAt), "MMM d")}
+                      </span>
                     </div>
-                    <ChevronRight className={cn("mt-1 size-5 transition", expanded && "rotate-90")} />
-                  </button>
-                  <CopyPostButton
-                    content={post.content}
-                    label={`Copy ${post.title} text`}
-                    compact
-                    className="shrink-0 self-start"
-                  />
-                </div>
-              </CardHeader>
+                  </div>
+                  <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
+                </button>
+
+                <CopyPostButton
+                  content={post.content}
+                  label={`Copy ${post.title} text`}
+                  compact
+                  className="shrink-0"
+                />
+              </div>
+
               {expanded ? (
-                <>
-                  <CardContent className="space-y-5">
-                    {post.approvalStatus && post.approvalStatus !== "pending" ? (
-                      <div
-                        className={cn(
-                          "flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium",
-                          post.approvalStatus === "approved" && "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-                          post.approvalStatus === "rejected" && "border border-red-500/30 bg-red-500/10 text-red-400",
-                          post.approvalStatus === "needs-revision" && "border border-amber-500/30 bg-amber-500/10 text-amber-400",
-                        )}
-                      >
-                        {post.approvalStatus === "approved" ? <Check className="size-4" /> : null}
-                        {post.approvalStatus === "rejected" ? <X className="size-4" /> : null}
-                        {post.approvalStatus === "needs-revision" ? <PencilLine className="size-4" /> : null}
-                        {post.approvalStatus === "approved" ? "Approved — ready to publish" : null}
-                        {post.approvalStatus === "rejected" ? "Rejected" : null}
-                        {post.approvalStatus === "needs-revision" ? "Needs revision" : null}
+                <div className="border-t border-border/40 px-4 py-4 sm:px-5">
+                  <div className="space-y-5">
+                    {post.approvalStatus ? (
+                      <div className={cn("rounded-2xl border px-4 py-3 text-sm font-medium", getApprovalTone(post.approvalStatus))}>
+                        {APPROVAL_STATUS_META[post.approvalStatus]}
                       </div>
                     ) : null}
-                    <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                          LinkedIn Post Text
-                        </p>
-                        <CopyPostButton content={post.content} />
+
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <PostTypeBadge postType={post.postType} />
+                        <StatusBadge value={post.status} />
+                        {post.imageUrl ? (
+                          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                            <ImageIcon className="size-4" />
+                            Image attached
+                          </span>
+                        ) : null}
                       </div>
-                      {post.imageUrl ? (
-                        <div className="mb-4 space-y-3">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                              Attached Image
-                            </p>
-                            <Button
-                              variant="outline"
-                              className="h-11 px-4"
-                              render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
-                            >
-                              <Download />
-                              Download Image
-                            </Button>
-                          </div>
-                          <div className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20">
-                            <Image
-                              src={post.imageUrl}
-                              alt={`Attached image for ${post.title}`}
-                              width={1600}
-                              height={900}
-                              sizes="(max-width: 768px) 100vw, 720px"
-                              className="h-auto max-h-[28rem] w-full object-cover md:max-w-3xl"
-                            />
-                          </div>
-                        </div>
-                      ) : null}
                       <pre className="font-sans whitespace-pre-wrap text-sm leading-6 text-foreground">
                         {post.content}
                       </pre>
                     </div>
-                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+
+                    {post.imageUrl ? (
                       <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            className="h-11 w-full border-border/40 sm:w-auto"
+                            render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
+                          >
+                            <Download />
+                            Download Image
+                          </Button>
+                        </div>
+                        <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                          <Image
+                            src={post.imageUrl}
+                            alt={`Attached image for ${post.title}`}
+                            width={1600}
+                            height={900}
+                            sizes="(max-width: 768px) 100vw, 720px"
+                            className="h-auto max-h-[28rem] w-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {post.approvalStatus !== "approved" ? (
+                        <Button className="h-11 w-full justify-center" onClick={() => openDialog(post.id, "approved")}>
+                          <Check />
+                          Approve
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="outline"
+                        className="h-11 w-full justify-center border-border/40"
+                        onClick={() => openDialog(post.id, "edit")}
+                      >
+                        <PencilLine />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-11 w-full justify-center border-border/40"
+                        onClick={() => openDialog(post.id, "comment")}
+                      >
+                        <MessageSquareText />
+                        Comment
+                      </Button>
+                      {post.approvalStatus !== "rejected" ? (
+                        <Button
+                          variant="destructive"
+                          className="h-11 w-full justify-center"
+                          onClick={() => openDialog(post.id, "rejected")}
+                        >
+                          <X />
+                          Reject
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium">Feedback thread</p>
-                        {post.comments.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No comments yet.</p>
-                        ) : (
-                          post.comments.map((comment) => (
-                            <div
-                              key={comment.id}
-                              className={cn(
-                                "rounded-2xl border p-3",
-                                comment.author === "edo"
-                                  ? "border-blue-500/30 bg-blue-500/5"
-                                  : "border-border/70 bg-muted/30",
-                              )}
-                            >
-                              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                <span className="font-medium">
+                        <span className="text-xs text-muted-foreground">
+                          {post.comments.length} comments
+                        </span>
+                      </div>
+
+                      {post.comments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No comments yet.</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {post.comments.map((comment) => (
+                            <div key={comment.id} className="space-y-1 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
+                              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground">
                                   {comment.author === "edo" ? "Edo" : "Zima"}
                                 </span>
                                 <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
                               </div>
-                              <p className="mt-2 text-sm leading-6">{comment.text}</p>
+                              <p className="text-sm leading-6">{comment.text}</p>
                             </div>
-                          ))
-                        )}
-                      </div>
-                      <div className="space-y-3">
-                        <p className="text-sm font-medium">Revision history</p>
-                        {post.revisions.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No saved revisions yet.</p>
-                        ) : (
-                          post.revisions.map((revision) => (
-                            <div
-                              key={revision.id}
-                              className="rounded-2xl border border-border/70 bg-muted/30 p-3"
-                            >
-                              <div className="text-xs text-muted-foreground">
-                                {format(parseISO(revision.createdAt), "MMM d, yyyy 'at' p")}
-                              </div>
-                              <p className="mt-2 line-clamp-4 text-sm text-muted-foreground">
-                                {revision.content}
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                  <CardFooter className="flex flex-wrap gap-2">
-                    {post.approvalStatus !== "approved" ? (
-                      <Button onClick={() => openDialog(post.id, "approved")}>
-                        <Check />
-                        Approve
-                      </Button>
-                    ) : null}
-                    <Button variant="outline" onClick={() => openDialog(post.id, "edit")}>
-                      <PencilLine />
-                      Edit
-                    </Button>
-                    <Button variant="outline" onClick={() => openDialog(post.id, "comment")}>
-                      <MessageSquareText />
-                      Comment
-                    </Button>
-                    {post.approvalStatus !== "rejected" ? (
-                      <Button variant="destructive" onClick={() => openDialog(post.id, "rejected")}>
-                        <X />
-                        Reject
-                      </Button>
-                    ) : null}
-                  </CardFooter>
-                </>
+                  </div>
+                </div>
               ) : null}
-            </Card>
+            </Surface>
           );
         })
       )}
@@ -1268,10 +1214,7 @@ function AnalyticsView() {
   const sortedByImpressions = [...posted].sort(
     (left, right) => safeNumber(right.metrics?.impressions) - safeNumber(left.metrics?.impressions),
   );
-  const totalImpressions = posted.reduce(
-    (sum, post) => sum + safeNumber(post.metrics?.impressions),
-    0,
-  );
+  const totalImpressions = posted.reduce((sum, post) => sum + safeNumber(post.metrics?.impressions), 0);
   const totalComments = posted.reduce((sum, post) => sum + safeNumber(post.metrics?.comments), 0);
   const avgImpressions = posted.length ? Math.round(totalImpressions / posted.length) : 0;
   const bestPost = sortedByImpressions[0];
@@ -1310,8 +1253,8 @@ function AnalyticsView() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex gap-4 overflow-x-auto pb-1">
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <StatCard
           label="Total Impressions"
           value={totalImpressions.toLocaleString()}
@@ -1326,8 +1269,16 @@ function AnalyticsView() {
         />
         <StatCard
           label="Best Post"
-          value={bestPost ? bestPost.title.slice(0, 18) + (bestPost.title.length > 18 ? "…" : "") : "N/A"}
-          hint={bestPost ? `${safeNumber(bestPost.metrics?.impressions).toLocaleString()} impressions` : "No published posts"}
+          value={
+            bestPost
+              ? bestPost.title.slice(0, 18) + (bestPost.title.length > 18 ? "…" : "")
+              : "N/A"
+          }
+          hint={
+            bestPost
+              ? `${safeNumber(bestPost.metrics?.impressions).toLocaleString()} impressions`
+              : "No published posts"
+          }
           icon={Flame}
         />
         <StatCard
@@ -1338,104 +1289,118 @@ function AnalyticsView() {
         />
       </div>
 
-      <Card className="border border-border/70 bg-card/80 backdrop-blur">
-        <CardHeader>
-          <CardTitle>Impressions Over Time</CardTitle>
-          <CardDescription>
-            LinkedIn and Substack growth trajectories from the manual analytics log.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-                <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: 16,
-                    border: "1px solid var(--border)",
-                    background: "var(--card)",
-                  }}
-                />
-                <Line
-                  dataKey="linkedin"
-                  type="monotone"
-                  stroke={LINKEDIN_COLOR}
-                  strokeWidth={2.5}
-                  dot={{ fill: LINKEDIN_COLOR, strokeWidth: 0 }}
-                />
-                <Line
-                  dataKey="substack"
-                  type="monotone"
-                  stroke={SUBSTACK_COLOR}
-                  strokeWidth={2.5}
-                  dot={{ fill: SUBSTACK_COLOR, strokeWidth: 0 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      <Surface>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold">Impressions Over Time</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            LinkedIn and Substack growth from the analytics log.
+          </p>
+        </div>
 
-      <Card className="border border-border/70 bg-card/80 backdrop-blur">
-        <CardHeader>
-          <CardTitle>Top Posts</CardTitle>
-          <CardDescription>Sorted by impressions, with manual entry for missing metrics.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+        <div className="h-80 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={12} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} />
+              <RechartsTooltip
+                contentStyle={{
+                  borderRadius: 16,
+                  border: "1px solid var(--border)",
+                  background: "var(--card)",
+                }}
+              />
+              <Line
+                dataKey="linkedin"
+                type="monotone"
+                stroke={LINKEDIN_COLOR}
+                strokeWidth={2.5}
+                dot={{ fill: LINKEDIN_COLOR, strokeWidth: 0 }}
+              />
+              <Line
+                dataKey="substack"
+                type="monotone"
+                stroke={SUBSTACK_COLOR}
+                strokeWidth={2.5}
+                dot={{ fill: SUBSTACK_COLOR, strokeWidth: 0 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Surface>
+
+      <Surface>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold">Posted Content</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Titles and the metrics that matter most.
+          </p>
+        </div>
+
+        <div className="space-y-3">
           {sortedByImpressions.map((post) => (
             <div
               key={post.id}
-              className="grid gap-3 rounded-2xl border border-border/70 bg-background/60 p-4 lg:grid-cols-[minmax(0,1fr)_120px_100px_100px_140px]"
+              className="rounded-2xl border border-border/40 bg-background/60 p-4"
             >
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2">
-                  <PlatformBadge platform={post.platform} />
-                  <PostTypeBadge postType={post.postType} />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap gap-2">
+                    <PlatformBadge platform={post.platform} />
+                    <PostTypeBadge postType={post.postType} />
+                  </div>
+                  <p className="mt-3 text-base font-medium leading-6">{post.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {format(parseISO(post.scheduledAt), "MMM d, yyyy")}
+                  </p>
                 </div>
-                <p className="font-medium">{post.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {format(parseISO(post.scheduledAt), "MMM d, yyyy")}
-                </p>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Impressions</div>
-                <div className="text-lg font-semibold">
-                  {safeNumber(post.metrics?.impressions).toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Comments</div>
-                <div className="text-lg font-semibold">
-                  {safeNumber(post.metrics?.comments).toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Reposts</div>
-                <div className="text-lg font-semibold">
-                  {safeNumber(post.metrics?.reposts).toLocaleString()}
-                </div>
-              </div>
-              <div className="flex items-center lg:justify-end">
-                <Button variant="outline" onClick={() => openMetrics(post.id)}>
+
+                <Button
+                  variant="outline"
+                  className="h-11 border-border/40 sm:shrink-0"
+                  onClick={() => openMetrics(post.id)}
+                >
                   <PencilLine />
                   Enter metrics
                 </Button>
               </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <div>
+                  <div className="text-muted-foreground">Impressions</div>
+                  <div className="text-lg font-semibold">
+                    {safeNumber(post.metrics?.impressions).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Comments</div>
+                  <div className="text-lg font-semibold">
+                    {safeNumber(post.metrics?.comments).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Reposts</div>
+                  <div className="text-lg font-semibold">
+                    {safeNumber(post.metrics?.reposts).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Reactions</div>
+                  <div className="text-lg font-semibold">
+                    {safeNumber(post.metrics?.reactions).toLocaleString()}
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </Surface>
 
       <Dialog open={Boolean(selectedPost)} onOpenChange={(open) => !open && setSelectedPostId(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Update Metrics</DialogTitle>
-            <DialogDescription>
-              Manual entry for published performance stats.
-            </DialogDescription>
+            <DialogDescription>Manual entry for published performance stats.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
@@ -1530,7 +1495,7 @@ function SettingsView() {
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="space-y-5">
-        <Card className="border border-border/70 bg-card/80 backdrop-blur">
+        <Card className="border border-border/40 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle>Theme</CardTitle>
             <CardDescription>Switch between system, light, and dark modes.</CardDescription>
@@ -1556,7 +1521,7 @@ function SettingsView() {
           </CardContent>
         </Card>
 
-        <Card className="border border-border/70 bg-card/80 backdrop-blur">
+        <Card className="border border-border/40 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle>Data Controls</CardTitle>
             <CardDescription>Export the full local store or restore it from JSON.</CardDescription>
@@ -1566,7 +1531,7 @@ function SettingsView() {
               <ArrowDownToLine />
               Export JSON
             </Button>
-            <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-muted">
+            <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border/40 bg-background px-4 text-sm font-medium hover:bg-muted">
               <ArrowUpFromLine className="size-4" />
               Import JSON
               <input
@@ -1590,7 +1555,7 @@ function SettingsView() {
           ) : null}
         </Card>
 
-        <Card className="border border-border/70 bg-card/80 backdrop-blur">
+        <Card className="border border-border/40 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle>Posting Schedule</CardTitle>
             <CardDescription>Configure the target publishing days for each platform.</CardDescription>
@@ -1624,7 +1589,7 @@ function SettingsView() {
       </div>
 
       <div className="space-y-5">
-        <Card className="border border-border/70 bg-card/80 backdrop-blur">
+        <Card className="border border-border/40 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle>Notifications</CardTitle>
             <CardDescription>Stored for future reminder workflows.</CardDescription>
@@ -1641,7 +1606,7 @@ function SettingsView() {
           </CardContent>
         </Card>
 
-        <Card className="border border-border/70 bg-card/80 backdrop-blur">
+        <Card className="border border-border/40 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle>Strategy Notes</CardTitle>
             <CardDescription>Reference snapshot for the current publishing system.</CardDescription>
@@ -1665,10 +1630,6 @@ export function ContentHubDashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const activeTab = parseTab(searchParams.get("tab"));
-  const todayPosts = data.posts.filter((post) => postMatchesDate(post, new Date())).length;
-  const pendingReviews = data.posts.filter(
-    (post) => post.approvalStatus === "pending" || post.approvalStatus === "needs-revision",
-  ).length;
 
   function setActiveTab(nextTab: TabId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -1687,7 +1648,7 @@ export function ContentHubDashboard() {
   if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex items-center gap-3 rounded-full border border-border/70 bg-card/80 px-5 py-3 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 rounded-full border border-border/40 bg-card/80 px-5 py-3 text-sm text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" />
           Loading content hub
         </div>
@@ -1696,173 +1657,79 @@ export function ContentHubDashboard() {
   }
 
   return (
-    <div className="bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.12),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.16),transparent_20%),linear-gradient(180deg,rgba(9,9,11,1),rgba(12,12,14,1))]">
-      <div className="mx-auto flex max-w-[1600px]">
-        <aside className="hidden w-72 shrink-0 border-r border-border/60 bg-sidebar/70 px-5 py-6 backdrop-blur xl:flex xl:flex-col">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs uppercase tracking-[0.24em] text-muted-foreground">
-              <Sparkles className="size-3.5" />
-              Content Hub
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Creator operating system</h1>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Mobile-first publishing, review, and analytics across LinkedIn and Substack.
-              </p>
-            </div>
-          </div>
-
-          <nav className="mt-8 space-y-2">
-            {TAB_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const active = item.id === activeTab;
-              return (
-                <button
-                  key={item.id}
-                  className={cn(
-                    "flex min-h-11 w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition",
-                    active
-                      ? "bg-foreground text-background shadow-lg"
-                      : "bg-transparent text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                  )}
-                  onClick={() => setActiveTab(item.id)}
-                  type="button"
-                >
-                  <Icon className="size-4" />
-                  <div>
-                    <div className="font-medium">{item.label}</div>
-                    <div className={cn("text-xs", active ? "text-background/70" : "text-muted-foreground")}>
-                      {item.description}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="mt-auto grid gap-3">
-            <Card size="sm" className="border border-border/70 bg-background/60">
-              <CardHeader>
-                <CardDescription>Today</CardDescription>
-                <CardTitle>{todayPosts} scheduled items</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card size="sm" className="border border-border/70 bg-background/60">
-              <CardHeader>
-                <CardDescription>Review Queue</CardDescription>
-                <CardTitle>{pendingReviews} drafts need attention</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
-        </aside>
-
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-border/60 bg-background/75 backdrop-blur">
-            <div className="flex min-h-18 items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-3">
-                <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-                  <SheetTrigger
-                    render={
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="xl:hidden"
-                        aria-label="Open navigation"
-                      />
-                    }
-                  >
-                    <Menu />
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-[88vw] max-w-sm border-r border-border/70">
-                    <SheetHeader>
-                      <SheetTitle>Content Hub</SheetTitle>
-                      <SheetDescription>Navigate between the five dashboard views.</SheetDescription>
-                    </SheetHeader>
-                    <div className="space-y-2 p-4 pt-0">
-                      {TAB_ITEMS.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <button
-                            key={item.id}
-                            className={cn(
-                              "flex min-h-11 w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition",
-                              item.id === activeTab
-                                ? "bg-foreground text-background"
-                                : "border border-border/70 bg-background text-foreground",
-                            )}
-                            onClick={() => setActiveTab(item.id)}
-                            type="button"
-                          >
-                            <Icon className="size-4" />
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </SheetContent>
-                </Sheet>
-                <div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                    {format(new Date(), "EEEE, MMMM d")}
-                  </div>
-                  <h2 className="text-lg font-semibold tracking-tight sm:text-2xl">
-                    {TAB_ITEMS.find((item) => item.id === activeTab)?.label}
-                  </h2>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.12),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.16),transparent_20%),linear-gradient(180deg,rgba(9,9,11,1),rgba(12,12,14,1))]">
+      <header className="sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex min-h-18 max-w-3xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+              <SheetTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon-lg"
+                    className="border-border/40"
+                    aria-label="Open navigation"
+                  />
+                }
+              >
+                <Menu className="size-5" />
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[88vw] max-w-sm border-r border-border/40">
+                <SheetHeader>
+                  <SheetTitle>Content Hub</SheetTitle>
+                  <SheetDescription>Navigate between the five dashboard views.</SheetDescription>
+                </SheetHeader>
+                <div className="space-y-2 p-4 pt-0">
+                  {TAB_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        className={cn(
+                          "flex min-h-11 w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition",
+                          item.id === activeTab
+                            ? "bg-foreground text-background"
+                            : "border border-border/40 bg-background text-foreground",
+                        )}
+                        onClick={() => setActiveTab(item.id)}
+                        type="button"
+                      >
+                        <Icon className="size-5" />
+                        <div>
+                          <div className="font-medium">{item.label}</div>
+                          <div className={cn("text-xs", item.id === activeTab ? "text-background/70" : "text-muted-foreground")}>
+                            {item.description}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
+              </SheetContent>
+            </Sheet>
+
+            <div>
+              <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                {format(new Date(), "EEEE, MMMM d")}
               </div>
-              <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={<Button variant="outline" size="icon" aria-label="Pending reviews" />}
-                  >
-                    <FilePenLine />
-                  </TooltipTrigger>
-                  <TooltipContent>{pendingReviews} pending review items</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={<Button variant="outline" size="icon" aria-label="Theme status" />}
-                  >
-                    {data.settings.theme === "dark" ? <Moon /> : data.settings.theme === "light" ? <Sun /> : <PanelLeft />}
-                  </TooltipTrigger>
-                  <TooltipContent>Theme: {data.settings.theme}</TooltipContent>
-                </Tooltip>
-              </div>
+              <h1 className="text-lg font-semibold tracking-tight sm:text-2xl">
+                {TAB_ITEMS.find((item) => item.id === activeTab)?.label}
+              </h1>
             </div>
-          </header>
-
-          <main className="flex-1 px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:py-8 xl:pb-8">
-            <section className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-              <Card className="border border-border/70 bg-card/80 backdrop-blur">
-                <CardHeader>
-                  <CardDescription>Operating Summary</CardDescription>
-                  <CardTitle className="text-2xl">
-                    {data.posts.length} posts, {data.ideas.length} ideas, {pendingReviews} reviews in motion
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-              <Card className="border border-border/70 bg-card/80 backdrop-blur">
-                <CardHeader>
-                  <CardDescription>Posting Targets</CardDescription>
-                  <CardTitle className="text-base">
-                    LinkedIn {data.settings.postingSchedule.linkedin.length} days/week, Substack{" "}
-                    {data.settings.postingSchedule.substack.length} days/week
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-            </section>
-
-            {activeTab === "calendar" ? <CalendarView /> : null}
-            {activeTab === "ideas" ? <IdeasView /> : null}
-            {activeTab === "drafts" ? <DraftsView /> : null}
-            {activeTab === "analytics" ? <AnalyticsView /> : null}
-            {activeTab === "settings" ? <SettingsView /> : null}
-          </main>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-background/92 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur xl:hidden">
-        <div className="grid grid-cols-5 gap-1">
+      <main className="mx-auto flex-1 max-w-3xl px-4 py-4 pb-24 sm:py-5">
+        {activeTab === "calendar" ? <CalendarView /> : null}
+        {activeTab === "ideas" ? <IdeasView /> : null}
+        {activeTab === "drafts" ? <DraftsView /> : null}
+        {activeTab === "analytics" ? <AnalyticsView /> : null}
+        {activeTab === "settings" ? <SettingsView /> : null}
+      </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/92 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur">
+        <div className="mx-auto grid max-w-3xl grid-cols-5 gap-1">
           {TAB_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = item.id === activeTab;
@@ -1876,7 +1743,7 @@ export function ContentHubDashboard() {
                 onClick={() => setActiveTab(item.id)}
                 type="button"
               >
-                <Icon className="mb-1 size-4" />
+                <Icon className="mb-1 size-5" />
                 {item.label}
               </button>
             );
