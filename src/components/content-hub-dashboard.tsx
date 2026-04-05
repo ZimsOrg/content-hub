@@ -376,18 +376,35 @@ function ImageViewerOverlay({ src, alt, onClose }: { src: string; alt: string; o
         onTouchEnd={(event) => { handleTouchEnd(event); handleDoubleTap(event); }}
         style={{ touchAction: "none" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={alt}
-          className="max-h-full max-w-full object-contain transition-transform"
-          style={{
-            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-            transitionDuration: lastTouchRef.current ? "0ms" : "200ms",
-          }}
-          draggable={false}
-          onClick={(event) => event.stopPropagation()}
-        />
+        {isVideo(src) ? (
+          <video
+            src={src}
+            className="max-h-full max-w-full object-contain transition-transform"
+            style={{
+              transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+              transitionDuration: lastTouchRef.current ? "0ms" : "200ms",
+            }}
+            autoPlay
+            loop
+            muted
+            playsInline
+            controls
+            onClick={(event) => event.stopPropagation()}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={src}
+            alt={alt}
+            className="max-h-full max-w-full object-contain transition-transform"
+            style={{
+              transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+              transitionDuration: lastTouchRef.current ? "0ms" : "200ms",
+            }}
+            draggable={false}
+            onClick={(event) => event.stopPropagation()}
+          />
+        )}
       </div>
     </div>
   );
@@ -410,8 +427,33 @@ function ImageViewerProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TappableImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+function isVideo(src: string) {
+  return /\.(mp4|webm|mov)(\?|$)/i.test(src);
+}
+
+function isGif(src: string) {
+  return /\.gif(\?|$)/i.test(src);
+}
+
+function TappableMedia({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const { openImage } = useImageViewer();
+
+  if (isVideo(src)) {
+    return (
+      <video
+        src={src}
+        className={cn("cursor-pointer", className)}
+        onClick={() => openImage(src, alt)}
+        autoPlay
+        loop
+        muted
+        playsInline
+        controls={false}
+      />
+    );
+  }
+
+  // GIFs and regular images — use img tag (GIFs auto-animate)
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -422,6 +464,9 @@ function TappableImage({ src, alt, className }: { src: string; alt: string; clas
     />
   );
 }
+
+// Keep backward compat alias
+const TappableImage = TappableMedia;
 
 function safeNumber(value: number | undefined) {
   return value ?? 0;
