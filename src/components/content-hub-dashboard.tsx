@@ -959,7 +959,7 @@ function IdeasView() {
                 </span>
               </div>
 
-              <div className="mt-3 flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: "calc(100vh - 14rem)" }}>
+              <div className="mt-3 flex flex-col gap-3">
                 {column.ideas.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border/50 px-4 py-8 text-center text-base text-muted-foreground">
                     No ideas yet
