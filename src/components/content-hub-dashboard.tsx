@@ -724,10 +724,13 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
     <Surface className="h-full">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold">{formatDayLabel(date)}</h3>
+          <h3 className="text-xl font-bold tracking-tight">{formatDayLabel(date)}</h3>
           <p className="text-sm text-muted-foreground">Selected day agenda</p>
         </div>
-        <Badge variant="outline" className="ring-1 ring-inset ring-border/40">
+        <Badge
+          variant="outline"
+          className="h-7 rounded-full border-border/50 bg-foreground/[0.045] px-3 text-sm font-semibold ring-1 ring-inset ring-border/40"
+        >
           {posts.length} scheduled
         </Badge>
       </div>
@@ -752,17 +755,17 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
                     <PostTypeBadge postType={post.postType} />
                     <StatusBadge value={post.status} />
                   </div>
-                  <p className="text-base font-medium leading-6">{post.title}</p>
+                  <p className="text-lg font-semibold leading-7">{post.title}</p>
                 </div>
                 <CopyPostButton content={post.content} label={`Copy ${post.title} text`} compact />
               </div>
 
-              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="mt-3 flex items-center gap-2 text-base text-muted-foreground">
                 <Clock3 className="size-4" />
                 {format(parseISO(post.scheduledAt), "p")}
               </div>
 
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{post.content}</p>
+              <p className="mt-3 text-base leading-7 text-muted-foreground">{post.content}</p>
 
               {post.imageUrl ? (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
@@ -803,7 +806,7 @@ function CalendarView() {
       <Surface>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-xl font-semibold">{format(month, "MMMM yyyy")}</h3>
+            <h3 className="text-2xl font-bold tracking-tight lg:text-xl">{format(month, "MMMM yyyy")}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               Pick a day to see that day&apos;s agenda.
             </p>
@@ -839,7 +842,7 @@ function CalendarView() {
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-7 gap-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground sm:gap-2 sm:text-xs">
+        <div className="mt-4 grid grid-cols-7 gap-1 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground sm:gap-2 sm:text-sm">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div key={day} className="px-1 pb-2 text-center">
               {day}
@@ -857,44 +860,60 @@ function CalendarView() {
                 key={date.toISOString()}
                 type="button"
                 className={cn(
-                  "min-h-20 rounded-2xl border p-2 text-left transition sm:min-h-24",
+                  "aspect-square rounded-2xl border px-1 py-1.5 text-center transition sm:min-h-24 sm:aspect-auto sm:p-2 sm:text-left",
                   isActive
-                    ? "border-foreground/15 bg-foreground/[0.045]"
+                    ? "border-primary/25 bg-primary/[0.05]"
                     : "border-border/40 bg-background/70 hover:bg-muted/40",
                   !isSameMonth(date, month) && "opacity-45",
                 )}
                 onClick={() => setSelectedDate(date)}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      "flex size-7 items-center justify-center rounded-full text-sm font-medium",
-                      isToday(date) && "bg-foreground text-background",
-                    )}
-                  >
-                    {format(date, "d")}
-                  </span>
-                  <div className="flex gap-1">
+                <div className="flex h-full flex-col items-center justify-center gap-1 sm:block">
+                  <div className="flex items-center justify-center gap-2 sm:justify-between">
+                    <span
+                      className={cn(
+                        "flex items-center justify-center rounded-full text-base font-medium transition",
+                        isActive
+                          ? "size-9 bg-primary text-primary-foreground"
+                          : isToday(date)
+                            ? "size-9 bg-foreground text-background"
+                            : "size-8 text-foreground",
+                      )}
+                    >
+                      {format(date, "d")}
+                    </span>
+                    <div className="hidden items-center gap-1 sm:flex">
+                      {posts.slice(0, 3).map((post) => (
+                        <span
+                          key={post.id}
+                          className="size-1.5 rounded-full"
+                          style={{ backgroundColor: getPlatformColor(post.platform) }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1 sm:hidden">
                     {posts.slice(0, 3).map((post) => (
                       <span
                         key={post.id}
-                        className="size-1.5 rounded-full"
+                        className="size-2 rounded-full"
                         style={{ backgroundColor: getPlatformColor(post.platform) }}
                       />
                     ))}
                   </div>
-                </div>
 
-                <div className="mt-3 hidden space-y-1 text-xs sm:block">
-                  {posts.slice(0, 2).map((post) => (
-                    <div
-                      key={post.id}
-                      className="truncate rounded-xl px-2 py-1"
-                      style={{ backgroundColor: `${getPlatformColor(post.platform)}18` }}
-                    >
-                      {post.title}
-                    </div>
-                  ))}
+                  <div className="mt-3 hidden space-y-1 text-xs sm:block">
+                    {posts.slice(0, 2).map((post) => (
+                      <div
+                        key={post.id}
+                        className="truncate rounded-xl px-2 py-1"
+                        style={{ backgroundColor: `${getPlatformColor(post.platform)}18` }}
+                      >
+                        {post.title}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </button>
             );
