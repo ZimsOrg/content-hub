@@ -1127,7 +1127,7 @@ function DraftsView() {
                   onClick={() => setActivePostId(expanded ? null : post.id)}
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-lg font-semibold leading-6">{post.title}</p>
+                    <p className="text-lg font-semibold leading-7">{post.title}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <PlatformBadge platform={post.platform} />
                       {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
