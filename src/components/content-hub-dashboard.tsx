@@ -30,6 +30,7 @@ import {
   Copy,
   Download,
   FilePenLine,
+  ImageIcon,
   FileText,
   Flame,
   Lightbulb,
@@ -1046,6 +1047,12 @@ function DraftsView() {
                           <span>{format(parseISO(post.scheduledAt), "EEE, MMM d 'at' p")}</span>
                           <span>{post.comments.length} comments</span>
                           <span>{post.revisions.length} revisions</span>
+                          {post.imageUrl ? (
+                            <span className="inline-flex items-center gap-1 text-muted-foreground">
+                              <ImageIcon className="size-3.5" />
+                              Image
+                            </span>
+                          ) : null}
                         </CardDescription>
                       </div>
                     </div>
