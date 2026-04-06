@@ -17,10 +17,6 @@ import {
   subMonths,
 } from "date-fns";
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  BarChart3,
-  Bell,
   CalendarDays,
   Check,
   ChevronDown,
@@ -30,10 +26,8 @@ import {
   Clock3,
   Copy,
   Download,
-  FileText,
-  Flame,
   ImageIcon,
-  Lightbulb,
+  LayoutGrid,
   Link2,
   LoaderCircle,
   Menu,
@@ -46,19 +40,9 @@ import {
   Settings2,
   Sparkles,
   Sun,
-  TrendingUp,
   X,
 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,11 +87,9 @@ const TAB_ITEMS: {
   icon: typeof CalendarDays;
   description: string;
 }[] = [
-  { id: "calendar", label: "Calendar", icon: CalendarDays, description: "Schedule and agenda" },
-  { id: "ideas", label: "Ideas", icon: Lightbulb, description: "Idea bank and capture" },
-  { id: "drafts", label: "Drafts", icon: FileText, description: "Review and approvals" },
-  { id: "analytics", label: "Analytics", icon: BarChart3, description: "Performance tracking" },
-  { id: "settings", label: "Settings", icon: Settings2, description: "Theme and data controls" },
+  { id: "board", label: "Board", icon: LayoutGrid, description: "Content pipeline" },
+  { id: "calendar", label: "Calendar", icon: CalendarDays, description: "Publishing schedule" },
+  { id: "settings", label: "Settings", icon: Settings2, description: "Preferences" },
 ];
 
 const PLATFORM_META = {
@@ -213,7 +195,7 @@ const WEEKDAY_OPTIONS = [
 ];
 
 function parseTab(value: string | null): TabId {
-  return TAB_ITEMS.some((tab) => tab.id === value) ? (value as TabId) : "calendar";
+  return TAB_ITEMS.some((tab) => tab.id === value) ? (value as TabId) : "board";
 }
 
 function getPlatformColor(platform: PostPlatform) {
@@ -526,6 +508,14 @@ function Surface({
   );
 }
 
+type MetricsFormState = {
+  impressions: string;
+  comments: string;
+  reposts: string;
+  reactions: string;
+  followerDelta: string;
+};
+
 type CopyPostButtonProps = {
   content: string;
   label?: string;
@@ -567,33 +557,6 @@ function CopyPostButton({
       {copied ? <Check /> : <Copy />}
       {compact ? <span className="sr-only">{copied ? "Copied!" : label}</span> : copied ? "Copied!" : label}
     </Button>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: typeof TrendingUp;
-}) {
-  return (
-    <Card className="border border-border/40 bg-card/80 shadow-none">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-3">
-          <CardDescription>{label}</CardDescription>
-          <Icon className="size-4 text-muted-foreground" />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold tracking-tight">{value}</div>
-        <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -1010,7 +973,10 @@ function CalendarView() {
   const monthStart = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
   const monthEnd = addDays(startOfWeek(endOfMonth(month), { weekStartsOn: 0 }), 6);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const agenda = sortPostsByDate(data.posts.filter((post) => postMatchesDate(post, selectedDate)));
+  const calendarPosts = data.posts.filter(
+    (post) => post.approvalStatus === "approved" || post.status === "posted",
+  );
+  const agenda = sortPostsByDate(calendarPosts.filter((post) => postMatchesDate(post, selectedDate)));
 
   function handleMonthChange(nextMonth: Date) {
     setMonth(nextMonth);
@@ -1054,7 +1020,7 @@ function CalendarView() {
 
         <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {days.map((date) => {
-            const posts = sortPostsByDate(data.posts.filter((post) => postMatchesDate(post, date)));
+            const posts = sortPostsByDate(calendarPosts.filter((post) => postMatchesDate(post, date)));
             const isActive = isSameDay(date, selectedDate);
 
             return (
@@ -1133,195 +1099,76 @@ function CalendarView() {
   );
 }
 
-function IdeasView() {
-  const { data, updateIdea } = useContentHub();
+function BoardView() {
+  const { data, setApprovalStatus, saveMetrics, updateIdea } = useContentHub();
+  const [activePostId, setActivePostId] = useState<string | null>(null);
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
+  const [dialogMode, setDialogMode] = useState<"edit" | "comment" | ApprovalStatus | null>(null);
+  const [selectedMetricsPostId, setSelectedMetricsPostId] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<MetricsFormState>({
+    impressions: "",
+    comments: "",
+    reposts: "",
+    reactions: "",
+    followerDelta: "",
+  });
+  const ideas = sortIdeasByPriority(
+    data.ideas.filter((idea) => idea.status === "new" || idea.status === "developing"),
+  );
+  const activePost = data.posts.find((post) => post.id === activePostId) ?? null;
+  const selectedMetricsPost = data.posts.find((post) => post.id === selectedMetricsPostId) ?? null;
 
-  const ideas = sortIdeasByPriority(data.ideas);
   const columns: Array<{
+    id: string;
     title: string;
-    status: Idea["status"];
     tone: string;
-    ideas: Idea[];
+    empty: string;
+    ideas?: Idea[];
+    posts?: Post[];
   }> = [
     {
-      title: "New",
-      status: "new",
+      id: "ideas",
+      title: "Ideas",
       tone: "bg-background",
-      ideas: ideas.filter((idea) => idea.status === "new"),
+      empty: "No ideas in motion",
+      ideas,
     },
     {
-      title: "In Progress",
-      status: "developing",
+      id: "draft",
+      title: "Draft",
       tone: "bg-amber-500/10",
-      ideas: ideas.filter((idea) => idea.status === "developing"),
+      empty: "No pending drafts",
+      posts: sortPostsByDate(
+        data.posts.filter((post) => post.status === "draft" && post.approvalStatus === "pending"),
+      ),
     },
     {
-      title: "Scheduled",
-      status: "ready",
+      id: "review",
+      title: "Review",
+      tone: "bg-orange-500/10",
+      empty: "Nothing needs review",
+      posts: sortPostsByDate(
+        data.posts.filter((post) => post.status === "review" || post.approvalStatus === "needs-revision"),
+      ),
+    },
+    {
+      id: "approved",
+      title: "Approved",
       tone: "bg-emerald-500/10",
-      ideas: ideas.filter((idea) => idea.status === "ready"),
+      empty: "No approved content waiting",
+      posts: sortPostsByDate(
+        data.posts.filter((post) => post.approvalStatus === "approved" && post.status !== "posted"),
+      ),
+    },
+    {
+      id: "posted",
+      title: "Posted",
+      tone: "bg-blue-500/10",
+      empty: "No posted content yet",
+      posts: sortPostsByDate(data.posts.filter((post) => post.status === "posted")),
     },
   ];
-
-  return (
-    <div className="space-y-3">
-      {ideas.length === 0 ? (
-        <EmptyState
-          icon={Lightbulb}
-          title="No ideas yet"
-          description="Capture new ideas to build the next publishing run."
-        />
-      ) : (
-        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-3 sm:items-start sm:overflow-visible sm:px-0">
-          {columns.map((column) => (
-            <section
-              key={column.status}
-              className="flex w-[85vw] shrink-0 snap-center flex-col sm:w-auto"
-            >
-              <div className={cn("sticky top-0 z-10 flex items-center justify-between rounded-2xl border border-border/40 px-5 py-4", column.tone)}>
-                <h3 className="text-lg font-bold tracking-tight">{column.title}</h3>
-                <span className="flex size-7 items-center justify-center rounded-full bg-foreground/10 text-sm font-semibold">
-                  {column.ideas.length}
-                </span>
-              </div>
-
-              <div className="mt-3 flex flex-col gap-3">
-                {column.ideas.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-border/50 px-4 py-8 text-center text-base text-muted-foreground">
-                    No ideas yet
-                  </div>
-                ) : (
-                  column.ideas.map((idea) => {
-                    const expanded = expandedIdeaId === idea.id;
-
-                    return (
-                      <Surface key={idea.id} className="overflow-hidden p-0">
-                        <button
-                          type="button"
-                          className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left"
-                          onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
-                        >
-                          <div className="min-w-0">
-                            <p className="text-lg font-semibold leading-7">{idea.title}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <Badge
-                                className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)}
-                                variant="outline"
-                              >
-                                {PRIORITY_META[idea.priority].label}
-                              </Badge>
-                              <PlatformBadge platform={idea.platform} />
-                            </div>
-                          </div>
-                          <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
-                        </button>
-
-                        {expanded ? (
-                          <div className="border-t border-border/40 px-4 py-4">
-                            <div className="space-y-4">
-                              <p className="text-base leading-7 text-muted-foreground">
-                                {idea.description || "No description yet."}
-                              </p>
-
-                              {(idea.tags ?? []).length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {(idea.tags ?? []).map((tag) => (
-                                    <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
-                                      <Link2 />
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              ) : null}
-
-                              {idea.status !== "ready" ? (
-                                <Button className="h-12 w-full text-base" onClick={() => setSelectedIdea(idea)}>
-                                  <Plus />
-                                  Add to Calendar
-                                </Button>
-                              ) : (
-                                <div className="flex min-h-11 items-center text-base font-medium text-emerald-700 dark:text-emerald-400">
-                                  Scheduled ✓
-                                </div>
-                              )}
-
-                              <div className="flex flex-col gap-2">
-                                {idea.status === "new" ? (
-                                  <Button
-                                    variant="outline"
-                                    className="h-12 w-full text-base"
-                                    onClick={() => updateIdea(idea.id, { status: "developing" })}
-                                  >
-                                    Move to In Progress →
-                                  </Button>
-                                ) : null}
-
-                                {idea.status === "developing" ? (
-                                  <>
-                                    <Button
-                                      variant="outline"
-                                      className="h-12 w-full text-base"
-                                      onClick={() => updateIdea(idea.id, { status: "new" })}
-                                    >
-                                      ← Move to New
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      className="h-12 w-full text-base"
-                                      onClick={() => updateIdea(idea.id, { status: "ready" })}
-                                    >
-                                      Move to Scheduled →
-                                    </Button>
-                                  </>
-                                ) : null}
-
-                                {idea.status === "ready" ? (
-                                  <Button
-                                    variant="outline"
-                                    className="h-12 w-full text-base"
-                                    onClick={() => updateIdea(idea.id, { status: "developing" })}
-                                  >
-                                    ← Move to In Progress
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        ) : null}
-                      </Surface>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-
-      <ScheduleIdeaDialog
-        idea={selectedIdea}
-        open={Boolean(selectedIdea)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedIdea(null);
-          }
-        }}
-      />
-    </div>
-  );
-}
-
-function DraftsView() {
-  const { data, setApprovalStatus } = useContentHub();
-  const [activePostId, setActivePostId] = useState<string | null>(null);
-  const [dialogMode, setDialogMode] = useState<"edit" | "comment" | ApprovalStatus | null>(null);
-
-  const drafts = sortPostsByDate(
-    data.posts.filter((post) => post.status !== "posted" || post.approvalStatus !== "approved"),
-  );
-  const activePost = drafts.find((post) => post.id === activePostId) ?? null;
 
   function openDialog(postId: string, mode: "edit" | "comment" | ApprovalStatus) {
     const config = APPROVAL_ACTIONS.find((action) => action.value === mode);
@@ -1334,161 +1181,340 @@ function DraftsView() {
     setDialogMode(mode);
   }
 
+  function openMetrics(postId: string) {
+    const post = data.posts.find((entry) => entry.id === postId);
+    setSelectedMetricsPostId(postId);
+    setMetrics({
+      impressions: String(post?.metrics?.impressions ?? ""),
+      comments: String(post?.metrics?.comments ?? ""),
+      reposts: String(post?.metrics?.reposts ?? ""),
+      reactions: String(post?.metrics?.reactions ?? ""),
+      followerDelta: String(post?.metrics?.followerDelta ?? ""),
+    });
+  }
+
+  function submitMetrics() {
+    if (!selectedMetricsPost) {
+      return;
+    }
+
+    saveMetrics(selectedMetricsPost.id, {
+      impressions: Number(metrics.impressions || 0),
+      comments: Number(metrics.comments || 0),
+      reposts: Number(metrics.reposts || 0),
+      reactions: Number(metrics.reactions || 0),
+      followerDelta: Number(metrics.followerDelta || 0),
+    });
+    setSelectedMetricsPostId(null);
+  }
+
   return (
     <div className="space-y-3">
-      {drafts.length === 0 ? (
+      {columns.every((column) => (column.ideas?.length ?? column.posts?.length ?? 0) === 0) ? (
         <EmptyState
-          icon={FileText}
-          title="Draft queue is clear"
-          description="All scheduled content has been approved or posted."
+          icon={LayoutGrid}
+          title="Board is empty"
+          description="Add ideas or schedule content to start the pipeline."
         />
       ) : (
-        drafts.map((post) => {
-          const expanded = activePostId === post.id;
-
-          return (
-            <Surface key={post.id} className="p-0">
-              <div className="flex items-start gap-3 p-4 sm:p-5">
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
-                  onClick={() => setActivePostId(expanded ? null : post.id)}
-                >
-                  <div className="min-w-0">
-                    <p className="text-lg font-semibold leading-7">{post.title}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <PlatformBadge platform={post.platform} />
-                      {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
-                      <span className="text-base text-muted-foreground">
-                        {format(parseISO(post.scheduledAt), "MMM d")}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
-                </button>
-
-                <CopyPostButton
-                  content={post.content}
-                  label={`Copy ${post.title} text`}
-                  compact
-                  className="shrink-0"
-                />
+        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-5 lg:items-start lg:overflow-visible lg:px-0">
+          {columns.map((column) => (
+            <section key={column.id} className="flex w-[85vw] shrink-0 snap-center flex-col lg:w-auto">
+              <div
+                className={cn(
+                  "sticky top-0 z-10 flex items-center justify-between rounded-2xl border border-border/40 px-5 py-4",
+                  column.tone,
+                )}
+              >
+                <h3 className="text-lg font-bold tracking-tight">{column.title}</h3>
+                <span className="flex size-7 items-center justify-center rounded-full bg-foreground/10 text-sm font-semibold">
+                  {(column.ideas?.length ?? column.posts?.length) || 0}
+                </span>
               </div>
 
-              {expanded ? (
-                <div className="border-t border-border/40 px-4 py-4 sm:px-5">
-                  <div className="space-y-5">
-                    {post.approvalStatus ? (
-                      <div className={cn("rounded-2xl border px-4 py-3 text-base font-medium", getApprovalTone(post.approvalStatus))}>
-                        {APPROVAL_STATUS_META[post.approvalStatus]}
-                      </div>
-                    ) : null}
+              <div className="mt-3 flex flex-col gap-3">
+                {column.ideas?.map((idea) => {
+                  const expanded = expandedIdeaId === idea.id;
 
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <PostTypeBadge postType={post.postType} />
-                        <StatusBadge value={post.status} />
-                        {post.imageUrl ? (
-                          <span className="inline-flex items-center gap-1 text-base text-muted-foreground">
-                            <ImageIcon className="size-4" />
-                            Image attached
-                          </span>
-                        ) : null}
-                      </div>
-                      <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
-                        {post.content}
-                      </pre>
-                    </div>
-
-                    {post.imageUrl ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
-                            className="h-11 w-full border-border/40 sm:w-auto"
-                            render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
-                          >
-                            <Download />
-                            Download Image
-                          </Button>
+                  return (
+                    <Surface key={idea.id} className="overflow-hidden p-0">
+                      <button
+                        type="button"
+                        className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left"
+                        onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-lg font-semibold leading-7">{idea.title}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)} variant="outline">
+                              {PRIORITY_META[idea.priority].label}
+                            </Badge>
+                            <PlatformBadge platform={idea.platform} />
+                            <StatusBadge value={idea.status} />
+                          </div>
                         </div>
-                        <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
-                          <TappableImage
-                            src={post.imageUrl}
-                            alt={`Image for ${post.title}`}
-                            className="h-auto max-h-[28rem] w-full object-cover"
+                        <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
+                      </button>
+
+                      {expanded ? (
+                        <div className="border-t border-border/40 px-4 py-4">
+                          <div className="space-y-4">
+                            <p className="text-base leading-7 text-muted-foreground">
+                              {idea.description || "No description yet."}
+                            </p>
+
+                            {(idea.tags ?? []).length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {(idea.tags ?? []).map((tag) => (
+                                  <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
+                                    <Link2 />
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <Button className="h-12 w-full text-base" onClick={() => setSelectedIdea(idea)}>
+                              <Plus />
+                              Add to Calendar
+                            </Button>
+
+                            <div className="flex flex-col gap-2">
+                              {idea.status === "new" ? (
+                                <Button
+                                  variant="outline"
+                                  className="h-12 w-full text-base"
+                                  onClick={() => updateIdea(idea.id, { status: "developing" })}
+                                >
+                                  Move to Developing →
+                                </Button>
+                              ) : null}
+
+                              {idea.status === "developing" ? (
+                                <Button
+                                  variant="outline"
+                                  className="h-12 w-full text-base"
+                                  onClick={() => updateIdea(idea.id, { status: "new" })}
+                                >
+                                  ← Move to New
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </Surface>
+                  );
+                })}
+
+                {column.posts?.map((post) => {
+                  const expanded = activePostId === post.id;
+
+                  return (
+                    <Surface key={post.id} className="overflow-hidden p-0">
+                      <div className="p-4 sm:p-5">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
+                            onClick={() => setActivePostId(expanded ? null : post.id)}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-lg font-semibold leading-7">{post.title}</p>
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <PlatformBadge platform={post.platform} />
+                                {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
+                                <span className="text-base text-muted-foreground">
+                                  {format(parseISO(post.scheduledAt), "MMM d")}
+                                </span>
+                              </div>
+                            </div>
+                            <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
+                          </button>
+
+                          <CopyPostButton
+                            content={post.content}
+                            label={`Copy ${post.title} text`}
+                            compact
+                            className="shrink-0"
                           />
                         </div>
-                      </div>
-                    ) : null}
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {post.approvalStatus !== "approved" ? (
-                        <Button className="h-11 w-full justify-center" onClick={() => openDialog(post.id, "approved")}>
-                          <Check />
-                          Approve
-                        </Button>
-                      ) : null}
-                      <Button
-                        variant="outline"
-                        className="h-11 w-full justify-center border-border/40"
-                        onClick={() => openDialog(post.id, "edit")}
-                      >
-                        <PencilLine />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="h-11 w-full justify-center border-border/40"
-                        onClick={() => openDialog(post.id, "comment")}
-                      >
-                        <MessageSquareText />
-                        Comment
-                      </Button>
-                      {post.approvalStatus !== "rejected" ? (
-                        <Button
-                          variant="destructive"
-                          className="h-11 w-full justify-center"
-                          onClick={() => openDialog(post.id, "rejected")}
-                        >
-                          <X />
-                          Reject
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-base font-medium">Feedback thread</p>
-                        <span className="text-xs text-muted-foreground">
-                          {post.comments.length} comments
-                        </span>
+                        {post.imageUrl ? (
+                          <div className="mt-4 overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                            <TappableImage
+                              src={post.imageUrl}
+                              alt={`Image for ${post.title}`}
+                              className="h-28 w-full object-cover"
+                            />
+                          </div>
+                        ) : null}
                       </div>
 
-                      {post.comments.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No comments yet.</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {post.comments.map((comment) => (
-                            <div key={comment.id} className="space-y-1 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
-                              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                                <span className="font-medium text-foreground">
-                                  {comment.author === "edo" ? "Edo" : "Zima"}
-                                </span>
-                                <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
+                      {expanded ? (
+                        <div className="border-t border-border/40 px-4 py-4 sm:px-5">
+                          <div className="space-y-5">
+                            {post.approvalStatus ? (
+                              <div className={cn("rounded-2xl border px-4 py-3 text-base font-medium", getApprovalTone(post.approvalStatus))}>
+                                {APPROVAL_STATUS_META[post.approvalStatus]}
                               </div>
-                              <p className="text-base leading-7">{comment.text}</p>
+                            ) : null}
+
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <PostTypeBadge postType={post.postType} />
+                                <StatusBadge value={post.status} />
+                                {post.imageUrl ? (
+                                  <span className="inline-flex items-center gap-1 text-base text-muted-foreground">
+                                    <ImageIcon className="size-4" />
+                                    Image attached
+                                  </span>
+                                ) : null}
+                              </div>
+                              <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
+                                {post.content}
+                              </pre>
                             </div>
-                          ))}
+
+                            {post.imageUrl ? (
+                              <div className="space-y-3">
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    variant="outline"
+                                    className="h-11 w-full border-border/40 sm:w-auto"
+                                    render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
+                                  >
+                                    <Download />
+                                    Download Image
+                                  </Button>
+                                </div>
+                                <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                                  <TappableImage
+                                    src={post.imageUrl}
+                                    alt={`Image for ${post.title}`}
+                                    className="h-auto max-h-[28rem] w-full object-cover"
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {post.status === "posted" ? (
+                              <>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+                                    <div className="text-muted-foreground">Impressions</div>
+                                    <div className="text-xl font-semibold">
+                                      {safeNumber(post.metrics?.impressions).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+                                    <div className="text-muted-foreground">Comments</div>
+                                    <div className="text-xl font-semibold">
+                                      {safeNumber(post.metrics?.comments).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+                                    <div className="text-muted-foreground">Reposts</div>
+                                    <div className="text-xl font-semibold">
+                                      {safeNumber(post.metrics?.reposts).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+                                    <div className="text-muted-foreground">Reactions</div>
+                                    <div className="text-xl font-semibold">
+                                      {safeNumber(post.metrics?.reactions).toLocaleString()}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <Button
+                                  variant="outline"
+                                  className="h-11 w-full justify-center border-border/40"
+                                  onClick={() => openMetrics(post.id)}
+                                >
+                                  <PencilLine />
+                                  Enter Metrics
+                                </Button>
+                              </>
+                            ) : (
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {post.approvalStatus !== "approved" ? (
+                                  <Button className="h-11 w-full justify-center" onClick={() => openDialog(post.id, "approved")}>
+                                    <Check />
+                                    Approve
+                                  </Button>
+                                ) : null}
+                                <Button
+                                  variant="outline"
+                                  className="h-11 w-full justify-center border-border/40"
+                                  onClick={() => openDialog(post.id, "edit")}
+                                >
+                                  <PencilLine />
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="h-11 w-full justify-center border-border/40"
+                                  onClick={() => openDialog(post.id, "comment")}
+                                >
+                                  <MessageSquareText />
+                                  Comment
+                                </Button>
+                                {post.approvalStatus !== "rejected" ? (
+                                  <Button
+                                    variant="destructive"
+                                    className="h-11 w-full justify-center"
+                                    onClick={() => openDialog(post.id, "rejected")}
+                                  >
+                                    <X />
+                                    Reject
+                                  </Button>
+                                ) : null}
+                              </div>
+                            )}
+
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-base font-medium">Feedback thread</p>
+                                <span className="text-xs text-muted-foreground">
+                                  {post.comments.length} comments
+                                </span>
+                              </div>
+
+                              {post.comments.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No comments yet.</p>
+                              ) : (
+                                <div className="space-y-4">
+                                  {post.comments.map((comment) => (
+                                    <div key={comment.id} className="space-y-1 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
+                                      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground">
+                                          {comment.author === "edo" ? "Edo" : "Zima"}
+                                        </span>
+                                        <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
+                                      </div>
+                                      <p className="text-base leading-7">{comment.text}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      ) : null}
+                    </Surface>
+                  );
+                })}
+
+                {(column.ideas?.length ?? column.posts?.length ?? 0) === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border/50 px-4 py-8 text-center text-base text-muted-foreground">
+                    {column.empty}
                   </div>
-                </div>
-              ) : null}
-            </Surface>
-          );
-        })
+                ) : null}
+              </div>
+            </section>
+          ))}
+        </div>
       )}
 
       <DraftActionDialog
@@ -1501,202 +1527,18 @@ function DraftsView() {
           }
         }}
       />
-    </div>
-  );
-}
 
-function AnalyticsView() {
-  const { data, saveMetrics } = useContentHub();
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState({
-    impressions: "",
-    comments: "",
-    reposts: "",
-    reactions: "",
-    followerDelta: "",
-  });
-
-  const posted = data.posts.filter((post) => post.metrics || post.status === "posted");
-  const sortedByImpressions = [...posted].sort(
-    (left, right) => safeNumber(right.metrics?.impressions) - safeNumber(left.metrics?.impressions),
-  );
-  const totalImpressions = posted.reduce((sum, post) => sum + safeNumber(post.metrics?.impressions), 0);
-  const totalComments = posted.reduce((sum, post) => sum + safeNumber(post.metrics?.comments), 0);
-  const avgImpressions = posted.length ? Math.round(totalImpressions / posted.length) : 0;
-  const bestPost = sortedByImpressions[0];
-  const chartData = data.analytics.map((entry) => ({
-    date: format(new Date(`${entry.date}T00:00:00`), "MMM d"),
-    linkedin: entry.linkedinFollowers ?? null,
-    substack: entry.substackSubscribers ?? null,
-  }));
-  const selectedPost = data.posts.find((post) => post.id === selectedPostId) ?? null;
-
-  function openMetrics(postId: string) {
-    const post = data.posts.find((entry) => entry.id === postId);
-    setSelectedPostId(postId);
-    setMetrics({
-      impressions: String(post?.metrics?.impressions ?? ""),
-      comments: String(post?.metrics?.comments ?? ""),
-      reposts: String(post?.metrics?.reposts ?? ""),
-      reactions: String(post?.metrics?.reactions ?? ""),
-      followerDelta: String(post?.metrics?.followerDelta ?? ""),
-    });
-  }
-
-  function submitMetrics() {
-    if (!selectedPost) {
-      return;
-    }
-
-    saveMetrics(selectedPost.id, {
-      impressions: Number(metrics.impressions || 0),
-      comments: Number(metrics.comments || 0),
-      reposts: Number(metrics.reposts || 0),
-      reactions: Number(metrics.reactions || 0),
-      followerDelta: Number(metrics.followerDelta || 0),
-    });
-    setSelectedPostId(null);
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <StatCard
-          label="Total Impressions"
-          value={totalImpressions.toLocaleString()}
-          hint="Across all tracked posts"
-          icon={TrendingUp}
-        />
-        <StatCard
-          label="Avg Impressions"
-          value={avgImpressions.toLocaleString()}
-          hint="Mean per published post"
-          icon={BarChart3}
-        />
-        <StatCard
-          label="Best Post"
-          value={
-            bestPost
-              ? bestPost.title.slice(0, 18) + (bestPost.title.length > 18 ? "…" : "")
-              : "N/A"
+      <ScheduleIdeaDialog
+        idea={selectedIdea}
+        open={Boolean(selectedIdea)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedIdea(null);
           }
-          hint={
-            bestPost
-              ? `${safeNumber(bestPost.metrics?.impressions).toLocaleString()} impressions`
-              : "No published posts"
-          }
-          icon={Flame}
-        />
-        <StatCard
-          label="Total Comments"
-          value={totalComments.toLocaleString()}
-          hint="Signals audience conversation"
-          icon={MessageSquareText}
-        />
-      </div>
+        }}
+      />
 
-      <Surface>
-        <div className="mb-4">
-          <h3 className="text-xl font-bold tracking-tight sm:text-lg sm:font-semibold">Impressions Over Time</h3>
-        </div>
-
-        <div className="h-56 w-full sm:h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={12} />
-              <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-              <RechartsTooltip
-                contentStyle={{
-                  borderRadius: 16,
-                  border: "1px solid var(--border)",
-                  background: "var(--card)",
-                }}
-              />
-              <Line
-                dataKey="linkedin"
-                type="monotone"
-                stroke={LINKEDIN_COLOR}
-                strokeWidth={2.5}
-                dot={{ fill: LINKEDIN_COLOR, strokeWidth: 0 }}
-              />
-              <Line
-                dataKey="substack"
-                type="monotone"
-                stroke={SUBSTACK_COLOR}
-                strokeWidth={2.5}
-                dot={{ fill: SUBSTACK_COLOR, strokeWidth: 0 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Surface>
-
-      <Surface>
-        <div className="mb-4">
-          <h3 className="text-xl font-bold tracking-tight sm:text-lg sm:font-semibold">Posted Content</h3>
-        </div>
-
-        <div className="space-y-3">
-          {sortedByImpressions.map((post) => (
-            <div
-              key={post.id}
-              className="rounded-2xl border border-border/40 bg-background/60 p-4"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap gap-2">
-                    <PlatformBadge platform={post.platform} />
-                    <PostTypeBadge postType={post.postType} />
-                  </div>
-                  <p className="mt-3 text-lg font-semibold leading-6">{post.title}</p>
-                  <p className="mt-1 text-base text-muted-foreground">
-                    {format(parseISO(post.scheduledAt), "MMM d, yyyy")}
-                  </p>
-                </div>
-
-                <Button
-                  variant="outline"
-                  className="h-11 border-border/40 sm:shrink-0"
-                  onClick={() => openMetrics(post.id)}
-                >
-                  <PencilLine />
-                  Enter metrics
-                </Button>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                <div>
-                  <div className="text-muted-foreground">Impressions</div>
-                  <div className="text-xl font-semibold">
-                    {safeNumber(post.metrics?.impressions).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Comments</div>
-                  <div className="text-xl font-semibold">
-                    {safeNumber(post.metrics?.comments).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Reposts</div>
-                  <div className="text-xl font-semibold">
-                    {safeNumber(post.metrics?.reposts).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Reactions</div>
-                  <div className="text-xl font-semibold">
-                    {safeNumber(post.metrics?.reactions).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Surface>
-
-      <Dialog open={Boolean(selectedPost)} onOpenChange={(open) => !open && setSelectedPostId(null)}>
+      <Dialog open={Boolean(selectedMetricsPost)} onOpenChange={(open) => !open && setSelectedMetricsPostId(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-lg">Update Metrics</DialogTitle>
@@ -1729,7 +1571,7 @@ function AnalyticsView() {
               <Check />
               Save metrics
             </Button>
-            <Button variant="outline" className="h-12 text-base" onClick={() => setSelectedPostId(null)}>
+            <Button variant="outline" className="h-12 text-base" onClick={() => setSelectedMetricsPostId(null)}>
               Cancel
             </Button>
           </DialogFooter>
@@ -1857,7 +1699,6 @@ function SettingsView() {
 export function ContentHubDashboard() {
   const { data, isReady } = useContentHub();
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeTab, setActiveTabState] = useState<TabId>(() => parseTab(searchParams.get("tab")));
@@ -1868,7 +1709,7 @@ export function ContentHubDashboard() {
 
     // Update URL in background (non-blocking)
     const params = new URLSearchParams(searchParams.toString());
-    if (nextTab === "calendar") {
+    if (nextTab === "board") {
       params.delete("tab");
     } else {
       params.set("tab", nextTab);
@@ -1951,16 +1792,14 @@ export function ContentHubDashboard() {
         </div>
       </header>
 
-      <main className="mx-auto flex-1 max-w-3xl px-4 py-4 pb-24 sm:py-5">
+      <main className={cn("mx-auto flex-1 px-4 py-4 pb-24 sm:py-5", activeTab === "board" ? "max-w-[110rem]" : "max-w-3xl")}>
+        {activeTab === "board" ? <BoardView /> : null}
         {activeTab === "calendar" ? <CalendarView /> : null}
-        {activeTab === "ideas" ? <IdeasView /> : null}
-        {activeTab === "drafts" ? <DraftsView /> : null}
-        {activeTab === "analytics" ? <AnalyticsView /> : null}
         {activeTab === "settings" ? <SettingsView /> : null}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/92 px-1 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-5">
+        <div className="mx-auto grid max-w-3xl grid-cols-3">
           {TAB_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = item.id === activeTab;

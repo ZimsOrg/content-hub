@@ -1,8 +1,6 @@
 export type TabId =
+  | "board"
   | "calendar"
-  | "ideas"
-  | "drafts"
-  | "analytics"
   | "settings";
 
 export type Platform = "linkedin" | "substack" | "both";
