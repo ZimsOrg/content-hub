@@ -2,7 +2,7 @@
 
 ## Title: Simon Willison writes 95% of his code from his phone. That sentence should scare mid-career engineers.
 
-Simon Willison — creator of Django, one of the most respected developers alive — just said on Lenny's podcast that he writes 95% of his code from his phone.
+Simon Willison — creator of Django, one of the most respected developers alive — recently shared that he writes 95% of his code from his phone.
 
 Not pseudocode. Not notes. Actual shipping code. From his phone.
 

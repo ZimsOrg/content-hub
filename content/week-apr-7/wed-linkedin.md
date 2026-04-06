@@ -6,7 +6,7 @@ Anthropic just hit $19 billion in ARR. From $1 billion. In 14 months.
 
 Everyone's focused on the model quality. "Claude is so good." "Opus is amazing." Sure. But that's not why they're growing this fast.
 
-The real story is buried in an interview their Head of Growth did on Lenny's podcast this week.
+The real story is buried in a recent interview with their Head of Growth.
 
 They built an internal tool called CASH.
 

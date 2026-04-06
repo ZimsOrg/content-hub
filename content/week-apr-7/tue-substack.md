@@ -1,6 +1,6 @@
 # Tuesday Substack (Free) — Apr 8
 
-## Title: 5 Things That Actually Matter in AI This Week
+## Title: The AI Signal: 5 Stories Worth Your Attention
 
 Five stories from the past week that I think are worth your attention. Not a news recap — my take on what each one means for people who actually build things.
 
@@ -8,7 +8,7 @@ Five stories from the past week that I think are worth your attention. Not a new
 
 ### 1. Anthropic went from $1B to $19B ARR in 14 months
 
-Lenny Rachitsky just published an interview with Anthropic's Head of Growth, Amol Avasare. The numbers are absurd: $1 billion to $19 billion in annual recurring revenue in just over a year. That makes Claude the fastest-growing AI product in history.
+A recent interview with Anthropic's Head of Growth, Amol Avasare. The numbers are absurd: $1 billion to $19 billion in annual recurring revenue in just over a year. That makes Claude the fastest-growing AI product in history.
 
 But the interesting part isn't the number. It's how they did it.
 
@@ -30,7 +30,7 @@ My take: This is what "AI-native engineering" actually looks like. Not "AI assis
 
 ### 3. Simon Willison says mid-career engineers are more at risk than juniors
 
-On Lenny's podcast, Simon Willison (creator of Django, one of the most respected voices in dev tooling) said something that made me uncomfortable: mid-career engineers are more at risk from AI than juniors.
+In a recent interview, Simon Willison (creator of Django, one of the most respected voices in dev tooling) said something that made me uncomfortable: mid-career engineers are more at risk from AI than juniors.
 
 His reasoning: juniors are learning with AI from day one. They're native. Mid-career engineers have habits and workflows built around manually writing code. They're the ones who resist the tools and fall behind.
 
