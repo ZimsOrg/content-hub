@@ -1519,9 +1519,12 @@ function BoardView() {
           description="Add ideas or schedule content to start the pipeline."
         />
       ) : (
-        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-5 lg:items-start lg:overflow-visible lg:px-0">
+        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-5 lg:items-start lg:gap-5 lg:overflow-visible lg:px-0 xl:gap-6">
           {columns.map((column) => (
-            <section key={column.id} className="flex w-[85vw] shrink-0 snap-center flex-col lg:w-auto">
+            <section
+              key={column.id}
+              className="flex w-[85vw] shrink-0 snap-center flex-col lg:min-w-[250px] lg:w-auto"
+            >
               <div
                 className={cn(
                   "sticky top-0 z-10 flex items-center justify-between rounded-2xl border border-border/40 px-5 py-4",
@@ -1539,10 +1542,10 @@ function BoardView() {
                   const expanded = expandedIdeaId === idea.id;
 
                   return (
-                    <Surface key={idea.id} className="overflow-hidden p-0">
+                    <Surface key={idea.id} className="w-full overflow-hidden p-0">
                       <button
                         type="button"
-                        className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left"
+                        className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left lg:p-5"
                         onClick={() => openCardDialog(idea.id, "idea")}
                       >
                         <div className="min-w-0">
@@ -1558,7 +1561,7 @@ function BoardView() {
                       </button>
 
                       {expanded ? (
-                        <div className="border-t border-border/40 px-4 py-4">
+                        <div className="border-t border-border/40 px-4 py-4 lg:px-5">
                           <div className="space-y-4">
                             <PreviewText>{idea.description || "No description yet."}</PreviewText>
 
@@ -1576,7 +1579,7 @@ function BoardView() {
                         </div>
                       ) : null}
 
-                      <div className="border-t border-border/40 px-4 py-3">
+                      <div className="border-t border-border/40 px-4 py-3 lg:px-5">
                         <button
                           type="button"
                           className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground transition hover:text-foreground"
@@ -1597,8 +1600,8 @@ function BoardView() {
                   const expanded = expandedPostId === post.id;
 
                   return (
-                    <Surface key={post.id} className="overflow-hidden p-0">
-                      <div className="p-4 sm:p-5">
+                    <Surface key={post.id} className="w-full overflow-hidden p-0">
+                      <div className="p-4 sm:p-5 lg:p-6">
                         <div className="flex items-start gap-3">
                           <button
                             type="button"
@@ -1630,14 +1633,14 @@ function BoardView() {
                             <TappableImage
                               src={post.imageUrl}
                               alt={`Image for ${post.title}`}
-                              className="h-28 w-full object-cover"
+                              className="h-32 w-full object-cover lg:h-40"
                             />
                           </div>
                         ) : null}
                       </div>
 
                       {expanded ? (
-                        <div className="border-t border-border/40 px-4 py-4 sm:px-5">
+                        <div className="border-t border-border/40 px-4 py-4 sm:px-5 lg:px-6">
                           <div className="space-y-4">
                             <div className="flex flex-wrap items-center gap-2">
                               <PostTypeBadge postType={post.postType} />
@@ -1655,7 +1658,7 @@ function BoardView() {
                                 <TappableImage
                                   src={post.imageUrl}
                                   alt={`Image for ${post.title}`}
-                                  className="h-32 w-full object-cover"
+                                  className="h-32 w-full object-cover lg:h-40"
                                 />
                               </div>
                             ) : null}
@@ -1663,7 +1666,7 @@ function BoardView() {
                         </div>
                       ) : null}
 
-                      <div className="border-t border-border/40 px-4 py-3 sm:px-5">
+                      <div className="border-t border-border/40 px-4 py-3 sm:px-5 lg:px-6">
                         <button
                           type="button"
                           className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground transition hover:text-foreground"
@@ -1935,7 +1938,7 @@ export function ContentHubDashboard() {
     <ImageViewerProvider>
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.12),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(0,119,181,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,103,25,0.16),transparent_20%),linear-gradient(180deg,rgba(9,9,11,1),rgba(12,12,14,1))]">
       <header className="sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex min-h-18 max-w-3xl items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex min-h-18 w-full max-w-[100rem] items-center justify-between gap-3 px-4 py-3 lg:px-8">
           <div className="flex items-center gap-3">
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger
@@ -1995,7 +1998,12 @@ export function ContentHubDashboard() {
         </div>
       </header>
 
-      <main className={cn("mx-auto flex-1 px-4 py-4 pb-24 sm:py-5", activeTab === "board" ? "max-w-[110rem]" : "max-w-3xl")}>
+      <main
+        className={cn(
+          "mx-auto flex-1 py-4 pb-24 sm:py-5",
+          activeTab === "board" ? "max-w-[100rem] px-4 lg:px-8" : "max-w-3xl px-4",
+        )}
+      >
         {activeTab === "board" ? <BoardView /> : null}
         {activeTab === "calendar" ? <CalendarView /> : null}
         {activeTab === "settings" ? <SettingsView /> : null}
