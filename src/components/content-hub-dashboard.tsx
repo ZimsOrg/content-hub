@@ -1342,6 +1342,17 @@ function CalendarView() {
             </Button>
             <Button
               variant="outline"
+              className="border-border/40 px-3 text-sm font-medium"
+              onClick={() => {
+                const today = new Date();
+                setSelectedDate(today);
+                setMonth(startOfMonth(today));
+              }}
+            >
+              Today
+            </Button>
+            <Button
+              variant="outline"
               size="icon-lg"
               className="border-border/40"
               onClick={handleNext}
