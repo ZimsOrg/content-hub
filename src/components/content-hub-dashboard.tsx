@@ -1386,8 +1386,6 @@ function CalendarView() {
 
 function BoardView() {
   const { data, setApprovalStatus, saveMetrics, updateIdea } = useContentHub();
-  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
-  const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<"idea" | "post" | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
@@ -1534,7 +1532,6 @@ function BoardView() {
 
               <div className="mt-3 flex flex-col gap-3">
                 {column.ideas?.map((idea) => {
-                  const expanded = expandedIdeaId === idea.id;
 
                   return (
                     <Surface key={idea.id} className="w-full overflow-hidden p-0">
@@ -1554,45 +1551,11 @@ function BoardView() {
                           </div>
                         </div>
                       </button>
-
-                      {expanded ? (
-                        <div className="border-t border-border/40 px-4 py-4 lg:px-5">
-                          <div className="space-y-4">
-                            <PreviewText>{idea.description || "No description yet."}</PreviewText>
-
-                            {(idea.tags ?? []).length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {(idea.tags ?? []).slice(0, 3).map((tag) => (
-                                  <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
-                                    <Link2 />
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <div className="border-t border-border/40 px-4 py-3 lg:px-5">
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground transition hover:text-foreground"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setExpandedIdeaId(expanded ? null : idea.id);
-                          }}
-                        >
-                          <span>{expanded ? "Show less" : "Show more"}</span>
-                          <ChevronDown className={cn("size-4 shrink-0 transition", expanded && "rotate-180")} />
-                        </button>
-                      </div>
                     </Surface>
                   );
                 })}
 
                 {column.posts?.map((post) => {
-                  const expanded = expandedPostId === post.id;
 
                   return (
                     <Surface key={post.id} className="w-full overflow-hidden p-0">
@@ -1632,47 +1595,6 @@ function BoardView() {
                             />
                           </div>
                         ) : null}
-                      </div>
-
-                      {expanded ? (
-                        <div className="border-t border-border/40 px-4 py-4 sm:px-5 lg:px-6">
-                          <div className="space-y-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <PostTypeBadge postType={post.postType} />
-                              <StatusBadge value={post.status} />
-                              {post.imageUrl ? (
-                                <span className="inline-flex items-center gap-1 text-base text-muted-foreground">
-                                  <ImageIcon className="size-4" />
-                                  Image attached
-                                </span>
-                              ) : null}
-                            </div>
-                            <PreviewText className="text-foreground">{post.content}</PreviewText>
-                            {post.imageUrl ? (
-                              <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
-                                <TappableImage
-                                  src={post.imageUrl}
-                                  alt={`Image for ${post.title}`}
-                                  className="h-32 w-full object-cover lg:h-40"
-                                />
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <div className="border-t border-border/40 px-4 py-3 sm:px-5 lg:px-6">
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground transition hover:text-foreground"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setExpandedPostId(expanded ? null : post.id);
-                          }}
-                        >
-                          <span>{expanded ? "Show less" : "Show more"}</span>
-                          <ChevronDown className={cn("size-4 shrink-0 transition", expanded && "rotate-180")} />
-                        </button>
                       </div>
                     </Surface>
                   );
