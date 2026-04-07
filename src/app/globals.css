@@ -134,26 +134,37 @@
   }
 }
 
+
 /* Always show scrollbar on the kanban board (desktop) */
 @media (min-width: 1024px) {
+  .kanban-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    overflow-x: scroll !important;
+  }
   .kanban-scroll::-webkit-scrollbar {
-    height: 8px;
+    height: 10px;
+    display: block !important;
   }
   .kanban-scroll::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(0, 0, 0, 0.05);
     border-radius: 8px;
   }
   .kanban-scroll::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
+    min-width: 40px;
   }
   .kanban-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(0, 0, 0, 0.3);
+  }
+  .dark .kanban-scroll {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+  .dark .kanban-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
   }
   .dark .kanban-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-  }
-  .dark .kanban-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.2);
   }
 }

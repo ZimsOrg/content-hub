@@ -2007,7 +2007,7 @@ export function ContentHubDashboard() {
 
       <main
         className={cn(
-          "mx-auto flex-1 py-4 pb-24 sm:py-5",
+          "mx-auto flex-1 py-4 pb-32 sm:py-5",
           activeTab === "board" ? "max-w-[100rem] px-4 lg:px-8" : "max-w-3xl px-4",
         )}
       >
