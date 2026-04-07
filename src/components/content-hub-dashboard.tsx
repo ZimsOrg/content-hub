@@ -1610,12 +1610,12 @@ function BoardView() {
             >
               <div
                 className={cn(
-                  "sticky top-0 z-10 flex items-center justify-between rounded-2xl border border-border/40 px-5 py-4",
+                  "sticky top-0 z-10 flex items-center justify-between gap-3 rounded-2xl border border-border/40 px-4 py-3",
                   column.tone,
                 )}
               >
-                <h3 className="text-lg font-bold tracking-tight">{column.title}</h3>
-                <span className="flex size-7 items-center justify-center rounded-full bg-foreground/10 text-sm font-semibold">
+                <h3 className="truncate text-base font-bold tracking-tight">{column.title}</h3>
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-xs font-semibold">
                   {(column.ideas?.length ?? column.posts?.length) || 0}
                 </span>
               </div>
