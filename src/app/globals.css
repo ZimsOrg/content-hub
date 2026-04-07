@@ -133,3 +133,27 @@
     background: color-mix(in oklab, var(--foreground) 18%, transparent);
   }
 }
+
+/* Always show scrollbar on the kanban board (desktop) */
+@media (min-width: 1024px) {
+  .kanban-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+  .kanban-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 8px;
+  }
+  .kanban-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+  }
+  .kanban-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .dark .kanban-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .dark .kanban-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}

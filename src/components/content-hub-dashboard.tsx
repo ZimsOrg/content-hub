@@ -1602,7 +1602,7 @@ function BoardView() {
           description="Add ideas or schedule content to start the pipeline."
         />
       ) : (
-        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:gap-6 lg:overflow-x-auto lg:px-0 lg:pb-4">
+        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 kanban-scroll lg:mx-0 lg:gap-6 lg:overflow-x-auto lg:px-0 lg:pb-4">
           {columns.map((column) => (
             <section
               key={column.id}
