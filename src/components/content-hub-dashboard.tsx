@@ -1058,7 +1058,7 @@ function BoardCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-x-hidden !inset-0 !bottom-0 !max-h-full !rounded-t-none sm:!inset-auto sm:!top-1/2 sm:!left-1/2 sm:!bottom-auto sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-xl sm:max-w-2xl sm:!max-h-[85vh]">
+      <DialogContent className="overflow-x-hidden !inset-0 !bottom-0 !max-h-full !rounded-t-none !pt-14 sm:!inset-auto sm:!top-1/2 sm:!left-1/2 sm:!bottom-auto sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-xl sm:max-w-2xl sm:!max-h-[85vh]">
         {activeIdea ? (
           <>
             <DialogHeader className="pr-10 overflow-hidden pb-3 border-b border-border/40">
