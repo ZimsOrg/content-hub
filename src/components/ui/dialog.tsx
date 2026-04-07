@@ -53,8 +53,8 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          // Mobile: bottom sheet
-          "fixed inset-x-0 bottom-0 z-50 grid w-full gap-4 rounded-t-2xl bg-popover p-5 pb-[max(env(safe-area-inset-bottom,0px),1.25rem)] text-sm text-popover-foreground ring-1 ring-foreground/10 duration-200 outline-none max-h-[92vh] overflow-y-auto",
+          // Mobile: bottom sheet — locked to screen, no horizontal overflow
+          "fixed inset-x-0 bottom-0 z-50 grid w-full max-w-[100vw] gap-4 rounded-t-2xl bg-popover p-5 pb-[max(env(safe-area-inset-bottom,0px),1.25rem)] text-sm text-popover-foreground ring-1 ring-foreground/10 duration-200 outline-none max-h-[92vh] overflow-y-auto overflow-x-hidden",
           "data-open:animate-in data-open:slide-in-from-bottom data-open:fade-in-0 data-closed:animate-out data-closed:slide-out-to-bottom data-closed:fade-out-0",
           // Desktop: centered dialog
           "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:bottom-auto sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:p-4 sm:pb-4 sm:max-h-[85vh]",

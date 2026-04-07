@@ -1074,7 +1074,7 @@ function BoardCardDialog({
             </DialogHeader>
 
             <div className="space-y-5">
-              <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
+              <pre className="font-sans whitespace-pre-wrap break-words text-base leading-7 text-foreground">
                 {activeIdea.description || "No description yet."}
               </pre>
 
@@ -1155,7 +1155,7 @@ function BoardCardDialog({
                 ) : null}
               </div>
 
-              <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
+              <pre className="font-sans whitespace-pre-wrap break-words text-base leading-7 text-foreground">
                 {activePost.content}
               </pre>
 
