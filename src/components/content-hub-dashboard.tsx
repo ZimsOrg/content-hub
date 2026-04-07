@@ -1486,6 +1486,7 @@ function BoardView() {
     id: string;
     title: string;
     tone: string;
+    cardBorder: string;
     empty: string;
     ideas?: Idea[];
     posts?: Post[];
@@ -1494,6 +1495,7 @@ function BoardView() {
       id: "ideas",
       title: "Ideas",
       tone: "bg-background",
+      cardBorder: "border-l-4 border-l-gray-300",
       empty: "No ideas in motion",
       ideas,
     },
@@ -1501,6 +1503,7 @@ function BoardView() {
       id: "draft",
       title: "Draft",
       tone: "bg-amber-500/10",
+      cardBorder: "border-l-4 border-l-amber-400",
       empty: "No pending drafts",
       posts: sortPostsByDate(
         data.posts.filter((post) => post.status === "draft" && post.approvalStatus === "pending"),
@@ -1510,6 +1513,7 @@ function BoardView() {
       id: "review",
       title: "Review",
       tone: "bg-orange-500/10",
+      cardBorder: "border-l-4 border-l-orange-400",
       empty: "Nothing needs review",
       posts: sortPostsByDate(
         data.posts.filter((post) => post.status === "review" || post.approvalStatus === "needs-revision"),
@@ -1519,6 +1523,7 @@ function BoardView() {
       id: "approved",
       title: "Approved",
       tone: "bg-emerald-500/10",
+      cardBorder: "border-l-4 border-l-emerald-400",
       empty: "No approved content waiting",
       posts: sortPostsByDate(
         data.posts.filter((post) => post.approvalStatus === "approved" && post.status !== "posted"),
@@ -1528,6 +1533,7 @@ function BoardView() {
       id: "posted",
       title: "Posted",
       tone: "bg-blue-500/10",
+      cardBorder: "border-l-4 border-l-blue-400",
       empty: "No posted content yet",
       posts: sortPostsByDate(data.posts.filter((post) => post.status === "posted")),
     },
@@ -1607,7 +1613,7 @@ function BoardView() {
                 {column.ideas?.map((idea) => {
 
                   return (
-                    <Surface key={idea.id} className="w-full overflow-hidden p-0">
+                    <Surface key={idea.id} className={cn("w-full overflow-hidden p-0", column.cardBorder)}>
                       <button
                         type="button"
                         className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left lg:p-5"
@@ -1631,7 +1637,7 @@ function BoardView() {
                 {column.posts?.map((post) => {
 
                   return (
-                    <Surface key={post.id} className="w-full overflow-hidden p-0">
+                    <Surface key={post.id} className={cn("w-full overflow-hidden p-0", column.cardBorder)}>
                       <div className="p-4 sm:p-5 lg:p-6">
                         <div className="flex items-start gap-3">
                           <button
