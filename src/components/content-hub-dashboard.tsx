@@ -1058,10 +1058,10 @@ function BoardCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-x-hidden sm:inset-4 sm:top-4 sm:left-4 sm:right-4 sm:bottom-4 sm:max-w-none sm:translate-x-0 sm:translate-y-0 sm:rounded-2xl sm:max-h-none">
+      <DialogContent className="overflow-x-hidden !inset-0 !bottom-0 !max-h-full !rounded-t-none sm:!inset-auto sm:!top-1/2 sm:!left-1/2 sm:!bottom-auto sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-xl sm:max-w-2xl sm:!max-h-[85vh]">
         {activeIdea ? (
           <>
-            <DialogHeader className="sticky top-0 z-10 bg-popover pr-10 overflow-hidden -mx-5 -mt-5 px-5 pt-5 pb-3 border-b border-border/40">
+            <DialogHeader className="pr-10 overflow-hidden pb-3 border-b border-border/40">
               <DialogTitle className="text-xl leading-tight">{activeIdea.title}</DialogTitle>
               <div className="flex flex-wrap gap-2">
                 <Badge className={cn("ring-1 ring-inset", PRIORITY_META[activeIdea.priority].badge)} variant="outline">
@@ -1121,7 +1121,7 @@ function BoardCardDialog({
 
         {activePost ? (
           <>
-            <DialogHeader className="sticky top-0 z-10 bg-popover pr-10 overflow-hidden -mx-5 -mt-5 px-5 pt-5 pb-3 border-b border-border/40">
+            <DialogHeader className="pr-10 overflow-hidden pb-3 border-b border-border/40">
               <DialogTitle className="text-xl leading-tight">{activePost.title}</DialogTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <PlatformBadge platform={activePost.platform} />
