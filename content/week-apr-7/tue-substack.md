@@ -1,6 +1,6 @@
 # Tuesday Substack (Free) — Apr 8
 
-## Title: The AI Signal: 5 Stories Worth Your Attention
+## Title: The Builder's Briefing: 5 AI Stories That Matter This Week
 
 Five stories from the past week that I think are worth your attention. Not a news recap — my take on what each one means for people who actually build things.
 
