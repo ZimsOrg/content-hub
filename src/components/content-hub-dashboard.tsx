@@ -1260,7 +1260,7 @@ function CalendarView() {
   const { data } = useContentHub();
   const [month, setMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [calendarMode, setCalendarMode] = useState<"month" | "week">("month");
+  const [calendarMode, setCalendarMode] = useState<"month" | "week">("week");
   const monthStart = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
   const monthEnd = addDays(startOfWeek(endOfMonth(month), { weekStartsOn: 0 }), 6);
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
@@ -1495,7 +1495,7 @@ function BoardView() {
       id: "ideas",
       title: "Ideas",
       tone: "bg-background",
-      cardBorder: "border-l-4 border-l-gray-300",
+      cardBorder: "bg-gray-50 dark:bg-gray-900/30",
       empty: "No ideas in motion",
       ideas,
     },
@@ -1503,7 +1503,7 @@ function BoardView() {
       id: "draft",
       title: "Draft",
       tone: "bg-amber-500/10",
-      cardBorder: "border-l-4 border-l-amber-400",
+      cardBorder: "bg-amber-50/60 dark:bg-amber-950/20",
       empty: "No pending drafts",
       posts: sortPostsByDate(
         data.posts.filter((post) => post.status === "draft" && post.approvalStatus === "pending"),
@@ -1513,7 +1513,7 @@ function BoardView() {
       id: "review",
       title: "Review",
       tone: "bg-orange-500/10",
-      cardBorder: "border-l-4 border-l-orange-400",
+      cardBorder: "bg-orange-50/60 dark:bg-orange-950/20",
       empty: "Nothing needs review",
       posts: sortPostsByDate(
         data.posts.filter((post) => post.status === "review" || post.approvalStatus === "needs-revision"),
@@ -1523,7 +1523,7 @@ function BoardView() {
       id: "approved",
       title: "Approved",
       tone: "bg-emerald-500/10",
-      cardBorder: "border-l-4 border-l-emerald-400",
+      cardBorder: "bg-emerald-50/60 dark:bg-emerald-950/20",
       empty: "No approved content waiting",
       posts: sortPostsByDate(
         data.posts.filter((post) => post.approvalStatus === "approved" && post.status !== "posted"),
@@ -1533,7 +1533,7 @@ function BoardView() {
       id: "posted",
       title: "Posted",
       tone: "bg-blue-500/10",
-      cardBorder: "border-l-4 border-l-blue-400",
+      cardBorder: "bg-blue-50/60 dark:bg-blue-950/20",
       empty: "No posted content yet",
       posts: sortPostsByDate(data.posts.filter((post) => post.status === "posted")),
     },
