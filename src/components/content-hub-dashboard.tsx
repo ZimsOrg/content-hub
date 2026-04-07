@@ -57,7 +57,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -890,6 +889,297 @@ function DraftActionDialog({
   );
 }
 
+function PreviewText({
+  children,
+  className,
+}: {
+  children: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("text-base leading-7 text-muted-foreground whitespace-pre-wrap", className)}
+      style={{
+        display: "-webkit-box",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: 3,
+        overflow: "hidden",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function PostMetricsGrid({ post }: { post: Post }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 text-sm">
+      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+        <div className="text-muted-foreground">Impressions</div>
+        <div className="text-xl font-semibold">
+          {safeNumber(post.metrics?.impressions).toLocaleString()}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+        <div className="text-muted-foreground">Comments</div>
+        <div className="text-xl font-semibold">
+          {safeNumber(post.metrics?.comments).toLocaleString()}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+        <div className="text-muted-foreground">Reposts</div>
+        <div className="text-xl font-semibold">
+          {safeNumber(post.metrics?.reposts).toLocaleString()}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
+        <div className="text-muted-foreground">Reactions</div>
+        <div className="text-xl font-semibold">
+          {safeNumber(post.metrics?.reactions).toLocaleString()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeedbackThread({ post }: { post: Post }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-base font-medium">Feedback thread</p>
+        <span className="text-xs text-muted-foreground">{post.comments.length} comments</span>
+      </div>
+
+      {post.comments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No comments yet.</p>
+      ) : (
+        <div className="space-y-4">
+          {post.comments.map((comment) => (
+            <div key={comment.id} className="space-y-1 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
+              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {comment.author === "edo" ? "Edo" : "Zima"}
+                </span>
+                <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
+              </div>
+              <p className="text-base leading-7">{comment.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BoardPostActions({
+  post,
+  onOpenAction,
+  onOpenMetrics,
+}: {
+  post: Post;
+  onOpenAction: (postId: string, mode: "edit" | "comment" | ApprovalStatus) => void;
+  onOpenMetrics: (postId: string) => void;
+}) {
+  if (post.status === "posted") {
+    return (
+      <>
+        <PostMetricsGrid post={post} />
+        <Button
+          variant="outline"
+          className="h-11 w-full justify-center border-border/40"
+          onClick={() => onOpenMetrics(post.id)}
+        >
+          <PencilLine />
+          Enter Metrics
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {post.approvalStatus !== "approved" ? (
+        <Button className="h-11 w-full justify-center" onClick={() => onOpenAction(post.id, "approved")}>
+          <Check />
+          Approve
+        </Button>
+      ) : null}
+      <Button
+        variant="outline"
+        className="h-11 w-full justify-center border-border/40"
+        onClick={() => onOpenAction(post.id, "edit")}
+      >
+        <PencilLine />
+        Edit
+      </Button>
+      <Button
+        variant="outline"
+        className="h-11 w-full justify-center border-border/40"
+        onClick={() => onOpenAction(post.id, "comment")}
+      >
+        <MessageSquareText />
+        Comment
+      </Button>
+      {post.approvalStatus !== "rejected" ? (
+        <Button
+          variant="destructive"
+          className="h-11 w-full justify-center"
+          onClick={() => onOpenAction(post.id, "rejected")}
+        >
+          <X />
+          Reject
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function BoardCardDialog({
+  idea,
+  post,
+  open,
+  onOpenChange,
+  onScheduleIdea,
+  onMoveIdeaStatus,
+  onOpenPostAction,
+  onOpenMetrics,
+}: {
+  idea: Idea | null;
+  post: Post | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onScheduleIdea: (idea: Idea) => void;
+  onMoveIdeaStatus: (ideaId: string, status: Idea["status"]) => void;
+  onOpenPostAction: (postId: string, mode: "edit" | "comment" | ApprovalStatus) => void;
+  onOpenMetrics: (postId: string) => void;
+}) {
+  const activeIdea = idea;
+  const activePost = post;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        {activeIdea ? (
+          <>
+            <DialogHeader className="pr-10">
+              <DialogTitle className="text-xl leading-tight">{activeIdea.title}</DialogTitle>
+              <div className="flex flex-wrap gap-2">
+                <Badge className={cn("ring-1 ring-inset", PRIORITY_META[activeIdea.priority].badge)} variant="outline">
+                  {PRIORITY_META[activeIdea.priority].label}
+                </Badge>
+                <PlatformBadge platform={activeIdea.platform} />
+                <PostTypeBadge postType={activeIdea.postType} />
+                <StatusBadge value={activeIdea.status} />
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
+                {activeIdea.description || "No description yet."}
+              </pre>
+
+              {(activeIdea.tags ?? []).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {(activeIdea.tags ?? []).map((tag) => (
+                    <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
+                      <Link2 />
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+
+              <Button className="h-12 w-full text-base" onClick={() => onScheduleIdea(activeIdea)}>
+                <Plus />
+                Add to Calendar
+              </Button>
+
+              <div className="flex flex-col gap-2">
+                {activeIdea.status === "new" ? (
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full text-base"
+                    onClick={() => onMoveIdeaStatus(activeIdea.id, "developing")}
+                  >
+                    Move to Developing →
+                  </Button>
+                ) : null}
+
+                {activeIdea.status === "developing" ? (
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full text-base"
+                    onClick={() => onMoveIdeaStatus(activeIdea.id, "new")}
+                  >
+                    ← Move to New
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {activePost ? (
+          <>
+            <DialogHeader className="pr-10">
+              <DialogTitle className="text-xl leading-tight">{activePost.title}</DialogTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <PlatformBadge platform={activePost.platform} />
+                <PostTypeBadge postType={activePost.postType} />
+                <StatusBadge value={activePost.status} />
+                {activePost.approvalStatus ? <StatusBadge value={activePost.approvalStatus} /> : null}
+                <span className="text-sm text-muted-foreground">
+                  {format(parseISO(activePost.scheduledAt), "MMM d")}
+                </span>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              {activePost.approvalStatus ? (
+                <div className={cn("rounded-2xl border px-4 py-3 text-base font-medium", getApprovalTone(activePost.approvalStatus))}>
+                  {APPROVAL_STATUS_META[activePost.approvalStatus]}
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                <CopyPostButton content={activePost.content} label={`Copy ${activePost.title} text`} className="w-full sm:w-auto" />
+                {activePost.imageUrl ? (
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full border-border/40 sm:w-auto"
+                    render={<a href={activePost.imageUrl} download={getImageDownloadName(activePost)} />}
+                  >
+                    <Download />
+                    Download Image
+                  </Button>
+                ) : null}
+              </div>
+
+              <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
+                {activePost.content}
+              </pre>
+
+              {activePost.imageUrl ? (
+                <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                  <TappableImage
+                    src={activePost.imageUrl}
+                    alt={`Image for ${activePost.title}`}
+                    className="h-auto max-h-[28rem] w-full object-cover"
+                  />
+                </div>
+              ) : null}
+
+              <BoardPostActions post={activePost} onOpenAction={onOpenPostAction} onOpenMetrics={onOpenMetrics} />
+
+              <FeedbackThread post={activePost} />
+            </div>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
   return (
     <Surface className="h-full">
@@ -1101,9 +1391,12 @@ function CalendarView() {
 
 function BoardView() {
   const { data, setApprovalStatus, saveMetrics, updateIdea } = useContentHub();
-  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [selectedCardType, setSelectedCardType] = useState<"idea" | "post" | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
+  const [selectedActionPostId, setSelectedActionPostId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<"edit" | "comment" | ApprovalStatus | null>(null);
   const [selectedMetricsPostId, setSelectedMetricsPostId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<MetricsFormState>({
@@ -1116,8 +1409,12 @@ function BoardView() {
   const ideas = sortIdeasByPriority(
     data.ideas.filter((idea) => idea.status === "new" || idea.status === "developing"),
   );
-  const activePost = data.posts.find((post) => post.id === activePostId) ?? null;
+  const selectedActionPost = data.posts.find((post) => post.id === selectedActionPostId) ?? null;
   const selectedMetricsPost = data.posts.find((post) => post.id === selectedMetricsPostId) ?? null;
+  const selectedDialogIdea =
+    selectedCardType === "idea" ? data.ideas.find((idea) => idea.id === selectedCardId) ?? null : null;
+  const selectedDialogPost =
+    selectedCardType === "post" ? data.posts.find((post) => post.id === selectedCardId) ?? null : null;
 
   const columns: Array<{
     id: string;
@@ -1177,8 +1474,13 @@ function BoardView() {
       return;
     }
 
-    setActivePostId(postId);
+    setSelectedActionPostId(postId);
     setDialogMode(mode);
+  }
+
+  function openCardDialog(cardId: string, cardType: "idea" | "post") {
+    setSelectedCardId(cardId);
+    setSelectedCardType(cardType);
   }
 
   function openMetrics(postId: string) {
@@ -1241,7 +1543,7 @@ function BoardView() {
                       <button
                         type="button"
                         className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left"
-                        onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
+                        onClick={() => openCardDialog(idea.id, "idea")}
                       >
                         <div className="min-w-0">
                           <p className="text-lg font-semibold leading-7">{idea.title}</p>
@@ -1253,19 +1555,16 @@ function BoardView() {
                             <StatusBadge value={idea.status} />
                           </div>
                         </div>
-                        <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
                       </button>
 
                       {expanded ? (
                         <div className="border-t border-border/40 px-4 py-4">
                           <div className="space-y-4">
-                            <p className="text-base leading-7 text-muted-foreground">
-                              {idea.description || "No description yet."}
-                            </p>
+                            <PreviewText>{idea.description || "No description yet."}</PreviewText>
 
                             {(idea.tags ?? []).length > 0 ? (
                               <div className="flex flex-wrap gap-2">
-                                {(idea.tags ?? []).map((tag) => (
+                                {(idea.tags ?? []).slice(0, 3).map((tag) => (
                                   <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40">
                                     <Link2 />
                                     {tag}
@@ -1273,42 +1572,29 @@ function BoardView() {
                                 ))}
                               </div>
                             ) : null}
-
-                            <Button className="h-12 w-full text-base" onClick={() => setSelectedIdea(idea)}>
-                              <Plus />
-                              Add to Calendar
-                            </Button>
-
-                            <div className="flex flex-col gap-2">
-                              {idea.status === "new" ? (
-                                <Button
-                                  variant="outline"
-                                  className="h-12 w-full text-base"
-                                  onClick={() => updateIdea(idea.id, { status: "developing" })}
-                                >
-                                  Move to Developing →
-                                </Button>
-                              ) : null}
-
-                              {idea.status === "developing" ? (
-                                <Button
-                                  variant="outline"
-                                  className="h-12 w-full text-base"
-                                  onClick={() => updateIdea(idea.id, { status: "new" })}
-                                >
-                                  ← Move to New
-                                </Button>
-                              ) : null}
-                            </div>
                           </div>
                         </div>
                       ) : null}
+
+                      <div className="border-t border-border/40 px-4 py-3">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setExpandedIdeaId(expanded ? null : idea.id);
+                          }}
+                        >
+                          <span>{expanded ? "Show less" : "Show more"}</span>
+                          <ChevronDown className={cn("size-4 shrink-0 transition", expanded && "rotate-180")} />
+                        </button>
+                      </div>
                     </Surface>
                   );
                 })}
 
                 {column.posts?.map((post) => {
-                  const expanded = activePostId === post.id;
+                  const expanded = expandedPostId === post.id;
 
                   return (
                     <Surface key={post.id} className="overflow-hidden p-0">
@@ -1317,7 +1603,7 @@ function BoardView() {
                           <button
                             type="button"
                             className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
-                            onClick={() => setActivePostId(expanded ? null : post.id)}
+                            onClick={() => openCardDialog(post.id, "post")}
                           >
                             <div className="min-w-0">
                               <p className="text-lg font-semibold leading-7">{post.title}</p>
@@ -1329,7 +1615,6 @@ function BoardView() {
                                 </span>
                               </div>
                             </div>
-                            <ChevronDown className={cn("mt-1 size-5 shrink-0 transition", expanded && "rotate-180")} />
                           </button>
 
                           <CopyPostButton
@@ -1353,155 +1638,44 @@ function BoardView() {
 
                       {expanded ? (
                         <div className="border-t border-border/40 px-4 py-4 sm:px-5">
-                          <div className="space-y-5">
-                            {post.approvalStatus ? (
-                              <div className={cn("rounded-2xl border px-4 py-3 text-base font-medium", getApprovalTone(post.approvalStatus))}>
-                                {APPROVAL_STATUS_META[post.approvalStatus]}
-                              </div>
-                            ) : null}
-
-                            <div className="space-y-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <PostTypeBadge postType={post.postType} />
-                                <StatusBadge value={post.status} />
-                                {post.imageUrl ? (
-                                  <span className="inline-flex items-center gap-1 text-base text-muted-foreground">
-                                    <ImageIcon className="size-4" />
-                                    Image attached
-                                  </span>
-                                ) : null}
-                              </div>
-                              <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">
-                                {post.content}
-                              </pre>
-                            </div>
-
-                            {post.imageUrl ? (
-                              <div className="space-y-3">
-                                <div className="flex flex-wrap gap-2">
-                                  <Button
-                                    variant="outline"
-                                    className="h-11 w-full border-border/40 sm:w-auto"
-                                    render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
-                                  >
-                                    <Download />
-                                    Download Image
-                                  </Button>
-                                </div>
-                                <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
-                                  <TappableImage
-                                    src={post.imageUrl}
-                                    alt={`Image for ${post.title}`}
-                                    className="h-auto max-h-[28rem] w-full object-cover"
-                                  />
-                                </div>
-                              </div>
-                            ) : null}
-
-                            {post.status === "posted" ? (
-                              <>
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-                                    <div className="text-muted-foreground">Impressions</div>
-                                    <div className="text-xl font-semibold">
-                                      {safeNumber(post.metrics?.impressions).toLocaleString()}
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-                                    <div className="text-muted-foreground">Comments</div>
-                                    <div className="text-xl font-semibold">
-                                      {safeNumber(post.metrics?.comments).toLocaleString()}
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-                                    <div className="text-muted-foreground">Reposts</div>
-                                    <div className="text-xl font-semibold">
-                                      {safeNumber(post.metrics?.reposts).toLocaleString()}
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-                                    <div className="text-muted-foreground">Reactions</div>
-                                    <div className="text-xl font-semibold">
-                                      {safeNumber(post.metrics?.reactions).toLocaleString()}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <Button
-                                  variant="outline"
-                                  className="h-11 w-full justify-center border-border/40"
-                                  onClick={() => openMetrics(post.id)}
-                                >
-                                  <PencilLine />
-                                  Enter Metrics
-                                </Button>
-                              </>
-                            ) : (
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                {post.approvalStatus !== "approved" ? (
-                                  <Button className="h-11 w-full justify-center" onClick={() => openDialog(post.id, "approved")}>
-                                    <Check />
-                                    Approve
-                                  </Button>
-                                ) : null}
-                                <Button
-                                  variant="outline"
-                                  className="h-11 w-full justify-center border-border/40"
-                                  onClick={() => openDialog(post.id, "edit")}
-                                >
-                                  <PencilLine />
-                                  Edit
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  className="h-11 w-full justify-center border-border/40"
-                                  onClick={() => openDialog(post.id, "comment")}
-                                >
-                                  <MessageSquareText />
-                                  Comment
-                                </Button>
-                                {post.approvalStatus !== "rejected" ? (
-                                  <Button
-                                    variant="destructive"
-                                    className="h-11 w-full justify-center"
-                                    onClick={() => openDialog(post.id, "rejected")}
-                                  >
-                                    <X />
-                                    Reject
-                                  </Button>
-                                ) : null}
-                              </div>
-                            )}
-
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-base font-medium">Feedback thread</p>
-                                <span className="text-xs text-muted-foreground">
-                                  {post.comments.length} comments
+                          <div className="space-y-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <PostTypeBadge postType={post.postType} />
+                              <StatusBadge value={post.status} />
+                              {post.imageUrl ? (
+                                <span className="inline-flex items-center gap-1 text-base text-muted-foreground">
+                                  <ImageIcon className="size-4" />
+                                  Image attached
                                 </span>
-                              </div>
-
-                              {post.comments.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No comments yet.</p>
-                              ) : (
-                                <div className="space-y-4">
-                                  {post.comments.map((comment) => (
-                                    <div key={comment.id} className="space-y-1 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
-                                      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                                        <span className="font-medium text-foreground">
-                                          {comment.author === "edo" ? "Edo" : "Zima"}
-                                        </span>
-                                        <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
-                                      </div>
-                                      <p className="text-base leading-7">{comment.text}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              ) : null}
                             </div>
+                            <PreviewText className="text-foreground">{post.content}</PreviewText>
+                            {post.imageUrl ? (
+                              <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
+                                <TappableImage
+                                  src={post.imageUrl}
+                                  alt={`Image for ${post.title}`}
+                                  className="h-32 w-full object-cover"
+                                />
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       ) : null}
+
+                      <div className="border-t border-border/40 px-4 py-3 sm:px-5">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setExpandedPostId(expanded ? null : post.id);
+                          }}
+                        >
+                          <span>{expanded ? "Show less" : "Show more"}</span>
+                          <ChevronDown className={cn("size-4 shrink-0 transition", expanded && "rotate-180")} />
+                        </button>
+                      </div>
                     </Surface>
                   );
                 })}
@@ -1517,13 +1691,42 @@ function BoardView() {
         </div>
       )}
 
+      <BoardCardDialog
+        idea={selectedDialogIdea}
+        post={selectedDialogPost}
+        open={Boolean(selectedCardId && selectedCardType)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedCardId(null);
+            setSelectedCardType(null);
+          }
+        }}
+        onScheduleIdea={(idea) => {
+          setSelectedCardId(null);
+          setSelectedCardType(null);
+          setSelectedIdea(idea);
+        }}
+        onMoveIdeaStatus={(ideaId, status) => updateIdea(ideaId, { status })}
+        onOpenPostAction={(postId, mode) => {
+          setSelectedCardId(null);
+          setSelectedCardType(null);
+          openDialog(postId, mode);
+        }}
+        onOpenMetrics={(postId) => {
+          setSelectedCardId(null);
+          setSelectedCardType(null);
+          openMetrics(postId);
+        }}
+      />
+
       <DraftActionDialog
-        post={activePost}
+        post={selectedActionPost}
         mode={dialogMode}
-        open={Boolean(activePost && dialogMode)}
+        open={Boolean(selectedActionPost && dialogMode)}
         onOpenChange={(open) => {
           if (!open) {
             setDialogMode(null);
+            setSelectedActionPostId(null);
           }
         }}
       />
