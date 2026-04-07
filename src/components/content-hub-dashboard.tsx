@@ -1058,10 +1058,10 @@ function BoardCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="overflow-x-hidden sm:max-w-2xl">
         {activeIdea ? (
           <>
-            <DialogHeader className="pr-10">
+            <DialogHeader className="pr-10 overflow-hidden">
               <DialogTitle className="text-xl leading-tight">{activeIdea.title}</DialogTitle>
               <div className="flex flex-wrap gap-2">
                 <Badge className={cn("ring-1 ring-inset", PRIORITY_META[activeIdea.priority].badge)} variant="outline">
@@ -1074,7 +1074,7 @@ function BoardCardDialog({
             </DialogHeader>
 
             <div className="space-y-5">
-              <pre className="font-sans whitespace-pre-wrap break-words text-base leading-7 text-foreground">
+              <pre className="font-sans whitespace-pre-wrap break-words overflow-hidden text-base leading-7 text-foreground">
                 {activeIdea.description || "No description yet."}
               </pre>
 
@@ -1121,7 +1121,7 @@ function BoardCardDialog({
 
         {activePost ? (
           <>
-            <DialogHeader className="pr-10">
+            <DialogHeader className="pr-10 overflow-hidden">
               <DialogTitle className="text-xl leading-tight">{activePost.title}</DialogTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <PlatformBadge platform={activePost.platform} />
@@ -1142,7 +1142,7 @@ function BoardCardDialog({
               ) : null}
 
               <div className="flex flex-wrap gap-2">
-                <CopyPostButton content={activePost.content} label={`Copy ${activePost.title} text`} className="w-full sm:w-auto" />
+                <CopyPostButton content={activePost.content} label="Copy Text" className="w-full sm:w-auto" />
                 {activePost.imageUrl ? (
                   <Button
                     variant="outline"
@@ -1155,7 +1155,7 @@ function BoardCardDialog({
                 ) : null}
               </div>
 
-              <pre className="font-sans whitespace-pre-wrap break-words text-base leading-7 text-foreground">
+              <pre className="font-sans whitespace-pre-wrap break-words overflow-hidden text-base leading-7 text-foreground">
                 {activePost.content}
               </pre>
 
