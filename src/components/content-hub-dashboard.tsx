@@ -1274,7 +1274,7 @@ function CalendarView() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="grid gap-4">
       <Surface>
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1379,12 +1379,7 @@ function CalendarView() {
         </div>
       </Surface>
 
-      <div className="lg:hidden">
-        <CalendarAgenda date={selectedDate} posts={agenda} />
-      </div>
-      <div className="hidden lg:block">
-        <CalendarAgenda date={selectedDate} posts={agenda} />
-      </div>
+      <CalendarAgenda date={selectedDate} posts={agenda} />
     </div>
   );
 }
