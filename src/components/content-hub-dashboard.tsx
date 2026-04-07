@@ -1260,32 +1260,83 @@ function CalendarView() {
   const { data } = useContentHub();
   const [month, setMonth] = useState(startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [calendarMode, setCalendarMode] = useState<"month" | "week">("month");
   const monthStart = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
   const monthEnd = addDays(startOfWeek(endOfMonth(month), { weekStartsOn: 0 }), 6);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
+  const weekEnd = addDays(weekStart, 6);
+  const days = eachDayOfInterval({
+    start: calendarMode === "month" ? monthStart : weekStart,
+    end: calendarMode === "month" ? monthEnd : weekEnd,
+  });
   const calendarPosts = data.posts.filter(
     (post) => post.approvalStatus === "approved" || post.status === "posted",
   );
   const agenda = sortPostsByDate(calendarPosts.filter((post) => postMatchesDate(post, selectedDate)));
+  const calendarLabel =
+    calendarMode === "month"
+      ? format(month, "MMMM yyyy")
+      : format(weekStart, "MMM d") +
+        " - " +
+        (isSameMonth(weekStart, weekEnd) ? format(weekEnd, "d, yyyy") : format(weekEnd, "MMM d, yyyy"));
 
   function handleMonthChange(nextMonth: Date) {
     setMonth(nextMonth);
     setSelectedDate(startOfMonth(nextMonth));
   }
 
+  function handlePrevious() {
+    if (calendarMode === "month") {
+      handleMonthChange(subMonths(month, 1));
+      return;
+    }
+
+    const nextDate = addDays(selectedDate, -7);
+    setSelectedDate(nextDate);
+    setMonth(startOfMonth(nextDate));
+  }
+
+  function handleNext() {
+    if (calendarMode === "month") {
+      handleMonthChange(addMonths(month, 1));
+      return;
+    }
+
+    const nextDate = addDays(selectedDate, 7);
+    setSelectedDate(nextDate);
+    setMonth(startOfMonth(nextDate));
+  }
+
   return (
     <div className="grid gap-4">
       <Surface>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h3 className="text-2xl font-bold tracking-tight lg:text-xl">{format(month, "MMMM yyyy")}</h3>
+            <h3 className="text-2xl font-bold tracking-tight lg:text-xl">{calendarLabel}</h3>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
+            <div className="inline-flex rounded-xl border border-border/40 bg-muted/30 p-0.5">
+              {(["month", "week"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={cn(
+                    "rounded-[10px] px-3 py-2 text-sm font-medium transition sm:px-4",
+                    calendarMode === mode
+                      ? "bg-foreground text-background shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => setCalendarMode(mode)}
+                >
+                  {mode === "month" ? "Month" : "Week"}
+                </button>
+              ))}
+            </div>
             <Button
               variant="outline"
               size="icon-lg"
               className="border-border/40"
-              onClick={() => handleMonthChange(subMonths(month, 1))}
+              onClick={handlePrevious}
             >
               <ChevronLeft />
             </Button>
@@ -1293,7 +1344,7 @@ function CalendarView() {
               variant="outline"
               size="icon-lg"
               className="border-border/40"
-              onClick={() => handleMonthChange(addMonths(month, 1))}
+              onClick={handleNext}
             >
               <ChevronRight />
             </Button>
@@ -1318,16 +1369,33 @@ function CalendarView() {
                 key={date.toISOString()}
                 type="button"
                 className={cn(
-                  "aspect-square rounded-2xl border px-1 py-1.5 text-center transition sm:min-h-24 sm:aspect-auto sm:p-2 sm:text-left",
+                  calendarMode === "month"
+                    ? "aspect-square rounded-2xl border px-1 py-1.5 text-center transition sm:min-h-24 sm:aspect-auto sm:p-2 sm:text-left"
+                    : "min-h-32 rounded-2xl border px-2 py-2 text-left transition sm:p-3",
                   isActive
                     ? "border-primary/25 bg-primary/[0.05]"
                     : "border-border/40 bg-background/70 hover:bg-muted/40",
-                  !isSameMonth(date, month) && "opacity-45",
+                  calendarMode === "month" && !isSameMonth(date, month) && "opacity-45",
                 )}
-                onClick={() => setSelectedDate(date)}
+                onClick={() => {
+                  setSelectedDate(date);
+                  setMonth(startOfMonth(date));
+                }}
               >
-                <div className="flex h-full flex-col items-center justify-center gap-1 sm:block">
-                  <div className="flex items-center justify-center gap-2 sm:justify-between">
+                <div
+                  className={cn(
+                    "flex h-full flex-col gap-1",
+                    calendarMode === "month"
+                      ? "items-center justify-center sm:block"
+                      : "justify-start",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex items-center gap-2",
+                      calendarMode === "month" ? "justify-center sm:justify-between" : "justify-between",
+                    )}
+                  >
                     <span
                       className={cn(
                         "flex items-center justify-center rounded-full text-base font-medium transition",
@@ -1351,7 +1419,7 @@ function CalendarView() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-center gap-1 sm:hidden">
+                  <div className={cn("flex items-center gap-1 sm:hidden", calendarMode === "month" ? "justify-center" : "justify-start")}>
                     {posts.slice(0, 3).map((post) => (
                       <span
                         key={post.id}
@@ -1361,7 +1429,12 @@ function CalendarView() {
                     ))}
                   </div>
 
-                  <div className="mt-3 hidden space-y-1 text-xs sm:block">
+                  <div
+                    className={cn(
+                      "mt-3 space-y-1 text-xs",
+                      calendarMode === "month" ? "hidden sm:block" : "block",
+                    )}
+                  >
                     {posts.slice(0, 2).map((post) => (
                       <div
                         key={post.id}
