@@ -41,3 +41,13 @@ The teams that figure this out will ship better products. The ones that don't wi
 We can build faster than we can decide what's worth building. And I think most engineering leaders haven't run into that wall yet.
 
 But they will.
+
+Here's my honest take:
+
+The engineering leader role is about to split in two. There will be leaders who manage output — shipping fast, hitting deadlines, keeping the machine running. And there will be leaders who manage insight — understanding customers deeply enough to always have the next meaningful problem ready.
+
+The first type will be automated. The second type will be the most valuable people in the building.
+
+If you're an engineering leader and your biggest skill is unblocking tickets and running standups, start worrying. If your biggest skill is knowing what's worth building before anyone else does, you've never been more valuable.
+
+The future of engineering leadership isn't about shipping faster. It's about thinking better.
