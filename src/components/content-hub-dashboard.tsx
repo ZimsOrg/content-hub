@@ -193,6 +193,20 @@ const WEEKDAY_OPTIONS = [
   { value: 6, label: "Sat" },
 ];
 
+const IDEA_STATUS_OPTIONS: { value: Idea["status"]; label: string }[] = [
+  { value: "new", label: IDEA_STATUS_META.new },
+  { value: "developing", label: IDEA_STATUS_META.developing },
+  { value: "ready", label: IDEA_STATUS_META.ready },
+];
+
+const POST_STATUS_OPTIONS: { value: Post["status"]; label: string }[] = [
+  { value: "idea", label: POST_STATUS_META.idea },
+  { value: "draft", label: POST_STATUS_META.draft },
+  { value: "review", label: POST_STATUS_META.review },
+  { value: "approved", label: POST_STATUS_META.approved },
+  { value: "posted", label: POST_STATUS_META.posted },
+];
+
 function parseTab(value: string | null): TabId {
   return TAB_ITEMS.some((tab) => tab.id === value) ? (value as TabId) : "board";
 }
@@ -595,6 +609,40 @@ function StatusBadge({
     <Badge className="ring-1 ring-inset ring-border/40" variant="outline">
       {label}
     </Badge>
+  );
+}
+
+function CardStatusSelect({
+  value,
+  options,
+  disabled = false,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+      <span className="font-medium">Status</span>
+      <select
+        className="h-9 rounded-lg border border-border/50 bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60"
+        value={value}
+        disabled={disabled}
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          event.stopPropagation();
+          onChange(event.target.value);
+        }}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -1041,6 +1089,7 @@ function BoardCardDialog({
   onOpenChange,
   onScheduleIdea,
   onMoveIdeaStatus,
+  onMovePostStatus,
   onOpenPostAction,
   onOpenMetrics,
 }: {
@@ -1050,6 +1099,7 @@ function BoardCardDialog({
   onOpenChange: (open: boolean) => void;
   onScheduleIdea: (idea: Idea) => void;
   onMoveIdeaStatus: (ideaId: string, status: Idea["status"]) => void;
+  onMovePostStatus: (postId: string, status: Post["status"]) => void;
   onOpenPostAction: (postId: string, mode: "edit" | "comment" | ApprovalStatus) => void;
   onOpenMetrics: (postId: string) => void;
 }) {
@@ -1095,27 +1145,11 @@ function BoardCardDialog({
                 Add to Calendar
               </Button>
 
-              <div className="flex flex-col gap-2">
-                {activeIdea.status === "new" ? (
-                  <Button
-                    variant="outline"
-                    className="h-12 w-full text-base"
-                    onClick={() => onMoveIdeaStatus(activeIdea.id, "developing")}
-                  >
-                    Move to Developing →
-                  </Button>
-                ) : null}
-
-                {activeIdea.status === "developing" ? (
-                  <Button
-                    variant="outline"
-                    className="h-12 w-full text-base"
-                    onClick={() => onMoveIdeaStatus(activeIdea.id, "new")}
-                  >
-                    ← Move to New
-                  </Button>
-                ) : null}
-              </div>
+              <CardStatusSelect
+                value={activeIdea.status}
+                options={IDEA_STATUS_OPTIONS}
+                onChange={(status) => onMoveIdeaStatus(activeIdea.id, status as Idea["status"])}
+              />
             </div>
           </>
         ) : null}
@@ -1141,6 +1175,12 @@ function BoardCardDialog({
                   {APPROVAL_STATUS_META[activePost.approvalStatus]}
                 </div>
               ) : null}
+
+              <CardStatusSelect
+                value={activePost.status}
+                options={POST_STATUS_OPTIONS}
+                onChange={(status) => onMovePostStatus(activePost.id, status as Post["status"])}
+              />
 
               <div className="flex flex-wrap gap-2">
                 <CopyPostButton content={activePost.content} label="Copy Text" className="w-full sm:w-auto" />
@@ -1471,13 +1511,14 @@ function CalendarView() {
 }
 
 function BoardView() {
-  const { data, setApprovalStatus, saveMetrics, updateIdea } = useContentHub();
+  const { data, setApprovalStatus, saveMetrics, setIdeaStatus, setPostStatus } = useContentHub();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<"idea" | "post" | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [selectedActionPostId, setSelectedActionPostId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<"edit" | "comment" | ApprovalStatus | null>(null);
   const [selectedMetricsPostId, setSelectedMetricsPostId] = useState<string | null>(null);
+  const [savingStatusKey, setSavingStatusKey] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<MetricsFormState>({
     impressions: "",
     comments: "",
@@ -1494,6 +1535,26 @@ function BoardView() {
     selectedCardType === "idea" ? data.ideas.find((idea) => idea.id === selectedCardId) ?? null : null;
   const selectedDialogPost =
     selectedCardType === "post" ? data.posts.find((post) => post.id === selectedCardId) ?? null : null;
+
+  async function handleIdeaStatusChange(ideaId: string, status: Idea["status"]) {
+    const key = `idea:${ideaId}`;
+    setSavingStatusKey(key);
+    try {
+      await setIdeaStatus(ideaId, status);
+    } finally {
+      setSavingStatusKey((current) => (current === key ? null : current));
+    }
+  }
+
+  async function handlePostStatusChange(postId: string, status: Post["status"]) {
+    const key = `post:${postId}`;
+    setSavingStatusKey(key);
+    try {
+      await setPostStatus(postId, status);
+    } finally {
+      setSavingStatusKey((current) => (current === key ? null : current));
+    }
+  }
 
   const columns: Array<{
     id: string;
@@ -1624,30 +1685,45 @@ function BoardView() {
 
               <div className="mt-3 flex flex-col gap-3">
                 {column.ideas?.map((idea) => {
+                  const isSaving = savingStatusKey === `idea:${idea.id}`;
 
                   return (
                     <Surface key={idea.id} className={cn("w-full overflow-hidden p-0", column.cardBorder)}>
-                      <button
-                        type="button"
-                        className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left lg:p-5"
-                        onClick={() => openCardDialog(idea.id, "idea")}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-lg font-semibold leading-7">{idea.title}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)} variant="outline">
-                              {PRIORITY_META[idea.priority].label}
-                            </Badge>
-                            <PlatformBadge platform={idea.platform} />
-                            <StatusBadge value={idea.status} />
+                      <div className="p-4 lg:p-5">
+                        <button
+                          type="button"
+                          className="flex min-h-11 w-full items-start justify-between gap-3 text-left"
+                          onClick={() => openCardDialog(idea.id, "idea")}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-lg font-semibold leading-7">{idea.title}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Badge className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)} variant="outline">
+                                {PRIORITY_META[idea.priority].label}
+                              </Badge>
+                              <PlatformBadge platform={idea.platform} />
+                              <StatusBadge value={idea.status} />
+                            </div>
                           </div>
+                        </button>
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                          <CardStatusSelect
+                            value={idea.status}
+                            options={IDEA_STATUS_OPTIONS}
+                            disabled={isSaving}
+                            onChange={(status) => {
+                              void handleIdeaStatusChange(idea.id, status as Idea["status"]);
+                            }}
+                          />
+                          {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
                         </div>
-                      </button>
+                      </div>
                     </Surface>
                   );
                 })}
 
                 {column.posts?.map((post) => {
+                  const isSaving = savingStatusKey === `post:${post.id}`;
 
                   return (
                     <Surface key={post.id} className={cn("w-full overflow-hidden p-0", column.cardBorder)}>
@@ -1687,6 +1763,18 @@ function BoardView() {
                             />
                           </div>
                         ) : null}
+
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                          <CardStatusSelect
+                            value={post.status}
+                            options={POST_STATUS_OPTIONS}
+                            disabled={isSaving}
+                            onChange={(status) => {
+                              void handlePostStatusChange(post.id, status as Post["status"]);
+                            }}
+                          />
+                          {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
+                        </div>
                       </div>
                     </Surface>
                   );
@@ -1718,7 +1806,12 @@ function BoardView() {
           setSelectedCardType(null);
           setSelectedIdea(idea);
         }}
-        onMoveIdeaStatus={(ideaId, status) => updateIdea(ideaId, { status })}
+        onMoveIdeaStatus={(ideaId, status) => {
+          void handleIdeaStatusChange(ideaId, status);
+        }}
+        onMovePostStatus={(postId, status) => {
+          void handlePostStatusChange(postId, status);
+        }}
         onOpenPostAction={(postId, mode) => {
           setSelectedCardId(null);
           setSelectedCardType(null);

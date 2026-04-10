@@ -22,6 +22,26 @@ function getDefaultData(): ContentHubData {
   return structuredClone(seedContentHubData);
 }
 
+const IDEA_STATUSES: Idea["status"][] = ["new", "developing", "ready"];
+const POST_STATUSES: Post["status"][] = ["idea", "draft", "review", "approved", "posted"];
+
+function getApprovalStatusForPostStatus(
+  status: Post["status"],
+  currentApprovalStatus?: Post["approvalStatus"],
+): Post["approvalStatus"] {
+  if (status === "approved" || status === "posted") {
+    return "approved";
+  }
+
+  if (status === "review") {
+    return currentApprovalStatus === "needs-revision" || currentApprovalStatus === "rejected"
+      ? currentApprovalStatus
+      : "pending";
+  }
+
+  return "pending";
+}
+
 // ---------------------------------------------------------------------------
 // GET — read full state from Postgres
 // ---------------------------------------------------------------------------
@@ -322,6 +342,74 @@ export async function PUT(request: Request) {
     console.error("PUT /api/data error:", error);
     return Response.json(
       { error: "Failed to save content hub data." },
+      { status: 500 },
+    );
+  }
+}
+
+
+export async function PATCH(request: Request) {
+  try {
+    const payload = (await request.json()) as
+      | { entity: "idea"; id: string; status: Idea["status"] }
+      | { entity: "post"; id: string; status: Post["status"] };
+
+    if (!payload?.id || !payload?.entity || !payload?.status) {
+      return Response.json({ error: "Invalid payload." }, { status: 400 });
+    }
+
+    if (payload.entity === "idea") {
+      if (!IDEA_STATUSES.includes(payload.status)) {
+        return Response.json({ error: "Invalid idea status." }, { status: 400 });
+      }
+
+      const result = await sql.query(
+        `UPDATE ideas
+         SET status = $2, updated_at = NOW()
+         WHERE id = $1
+         RETURNING id`,
+        [payload.id, payload.status],
+      );
+
+      if (result.length === 0) {
+        return Response.json({ error: "Idea not found." }, { status: 404 });
+      }
+
+      return GET();
+    }
+
+    if (!POST_STATUSES.includes(payload.status)) {
+      return Response.json({ error: "Invalid post status." }, { status: 400 });
+    }
+
+    const existingRows = await sql.query(
+      "SELECT approval_status FROM posts WHERE id = $1",
+      [payload.id],
+    );
+
+    if (existingRows.length === 0) {
+      return Response.json({ error: "Post not found." }, { status: 404 });
+    }
+
+    const currentApprovalStatus = existingRows[0].approval_status as Post["approvalStatus"] | null;
+    const approvalStatus = getApprovalStatusForPostStatus(
+      payload.status,
+      currentApprovalStatus || undefined,
+    );
+
+    await sql.query(
+      `UPDATE posts
+       SET status = $2, approval_status = $3, updated_at = NOW()
+       WHERE id = $1`,
+      [payload.id, payload.status, approvalStatus],
+    );
+
+    return GET();
+  } catch (error) {
+    console.error("PATCH /api/data error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return Response.json(
+      { error: "Failed to update content hub data.", detail: message },
       { status: 500 },
     );
   }

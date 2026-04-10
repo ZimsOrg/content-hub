@@ -52,9 +52,11 @@ type ContentHubContextValue = {
   isReady: boolean;
   addIdea: (input: NewIdeaInput) => void;
   updateIdea: (ideaId: string, patch: Partial<Idea>) => void;
+  setIdeaStatus: (ideaId: string, status: Idea["status"]) => Promise<void>;
   deleteIdea: (ideaId: string) => void;
   addPost: (input: NewPostInput) => void;
   updatePost: (postId: string, patch: Partial<Post>) => void;
+  setPostStatus: (postId: string, status: PostStatus) => Promise<void>;
   scheduleIdea: (input: ScheduleIdeaInput) => void;
   addComment: (postId: string, text: string, author?: Comment["author"]) => void;
   setApprovalStatus: (
@@ -101,6 +103,23 @@ function applyTheme(theme: ThemePreference) {
 
   root.classList.toggle("dark", resolvedTheme === "dark");
   root.style.colorScheme = resolvedTheme;
+}
+
+function getApprovalStatusForPostStatus(
+  status: PostStatus,
+  currentApprovalStatus?: Post["approvalStatus"],
+): Post["approvalStatus"] {
+  if (status === "approved" || status === "posted") {
+    return "approved";
+  }
+
+  if (status === "review") {
+    return currentApprovalStatus === "needs-revision" || currentApprovalStatus === "rejected"
+      ? currentApprovalStatus
+      : "pending";
+  }
+
+  return "pending";
 }
 
 export function ContentHubProvider({ children }: { children: ReactNode }) {
@@ -224,6 +243,45 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           ),
         }));
       },
+      setIdeaStatus: async (ideaId, status) => {
+        const previousIdea = data.ideas.find((idea) => idea.id === ideaId);
+        if (!previousIdea || previousIdea.status === status) {
+          return;
+        }
+
+        const nextUpdatedAt = new Date().toISOString();
+        setData((current) => ({
+          ...current,
+          ideas: current.ideas.map((idea) =>
+            idea.id === ideaId ? { ...idea, status, updatedAt: nextUpdatedAt } : idea,
+          ),
+        }));
+
+        try {
+          const response = await fetch("/api/data", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              entity: "idea",
+              id: ideaId,
+              status,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to persist idea status: ${response.status}`);
+          }
+        } catch (error) {
+          console.error("Failed to update idea status:", error);
+          setData((current) => ({
+            ...current,
+            ideas: current.ideas.map((idea) => (idea.id === ideaId ? previousIdea : idea)),
+          }));
+          throw error;
+        }
+      },
       deleteIdea: (ideaId) => {
         setData((current) => ({
           ...current,
@@ -265,6 +323,49 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
             post.id === postId ? { ...post, ...patch, updatedAt: new Date().toISOString() } : post,
           ),
         }));
+      },
+      setPostStatus: async (postId, status) => {
+        const previousPost = data.posts.find((post) => post.id === postId);
+        if (!previousPost || previousPost.status === status) {
+          return;
+        }
+
+        const approvalStatus = getApprovalStatusForPostStatus(status, previousPost.approvalStatus);
+        const nextUpdatedAt = new Date().toISOString();
+
+        setData((current) => ({
+          ...current,
+          posts: current.posts.map((post) =>
+            post.id === postId
+              ? { ...post, status, approvalStatus, updatedAt: nextUpdatedAt }
+              : post,
+          ),
+        }));
+
+        try {
+          const response = await fetch("/api/data", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              entity: "post",
+              id: postId,
+              status,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to persist post status: ${response.status}`);
+          }
+        } catch (error) {
+          console.error("Failed to update post status:", error);
+          setData((current) => ({
+            ...current,
+            posts: current.posts.map((post) => (post.id === postId ? previousPost : post)),
+          }));
+          throw error;
+        }
       },
       scheduleIdea: ({ ideaId, title, content, scheduledAt, platform }) => {
         const timestamp = new Date().toISOString();
