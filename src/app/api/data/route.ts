@@ -24,7 +24,7 @@ function getDefaultData(): ContentHubData {
 }
 
 const IDEA_STATUSES: Idea["status"][] = ["new", "developing", "ready"];
-const POST_STATUSES: Post["status"][] = ["idea", "draft", "review", "approved", "posted"];
+const POST_STATUSES: Post["status"][] = ["idea", "draft", "approved", "posted"];
 
 // ---------------------------------------------------------------------------
 // GET — read full state from Postgres

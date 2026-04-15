@@ -182,7 +182,7 @@ const seedPosts: Post[] = [
     imageUrl: "/images/batch-1/copilot-map-cropped.png",
     platform: "substack",
     postType: "paid-deep-dive",
-    status: "review",
+    status: "draft",
     approvalStatus: "pending",
     scheduledAt: "2026-04-08T09:00:00-07:00",
     comments: [

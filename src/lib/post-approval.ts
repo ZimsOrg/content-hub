@@ -8,12 +8,6 @@ export function getApprovalStatusForPostStatus(
     return "approved";
   }
 
-  if (status === "review") {
-    return currentApprovalStatus === "needs-revision" || currentApprovalStatus === "rejected"
-      ? currentApprovalStatus
-      : "pending";
-  }
-
   return "pending";
 }
 

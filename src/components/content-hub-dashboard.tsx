@@ -147,7 +147,6 @@ const IDEA_STATUS_META = {
 const POST_STATUS_META = {
   idea: "Idea",
   draft: "Draft",
-  review: "Review",
   approved: "Approved",
   posted: "Posted",
 } as const;
@@ -179,7 +178,6 @@ const IDEA_STATUS_OPTIONS: { value: Idea["status"]; label: string }[] = [
 const POST_STATUS_OPTIONS: { value: Post["status"]; label: string }[] = [
   { value: "idea", label: POST_STATUS_META.idea },
   { value: "draft", label: POST_STATUS_META.draft },
-  { value: "review", label: POST_STATUS_META.review },
   { value: "approved", label: POST_STATUS_META.approved },
   { value: "posted", label: POST_STATUS_META.posted },
 ];
@@ -1594,17 +1592,7 @@ function BoardView() {
       cardBorder: "bg-amber-50/60 dark:bg-amber-950/20",
       empty: "No pending drafts",
       posts: sortByNewest(
-        data.posts.filter((post) => post.status === "draft" && post.approvalStatus === "pending" && (showArchived || !post.archived)),
-      ),
-    },
-    {
-      id: "review",
-      title: "Review",
-      tone: "bg-orange-500/10",
-      cardBorder: "bg-orange-50/60 dark:bg-orange-950/20",
-      empty: "Nothing needs review",
-      posts: sortByNewest(
-        data.posts.filter((post) => (post.status === "review" || post.approvalStatus === "needs-revision") && (showArchived || !post.archived)),
+        data.posts.filter((post) => post.status === "draft" && (showArchived || !post.archived)),
       ),
     },
     {

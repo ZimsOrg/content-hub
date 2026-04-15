@@ -17,7 +17,7 @@ export type PostType =
 
 export type IdeaPriority = "high" | "medium" | "low";
 export type IdeaStatus = "new" | "developing" | "ready";
-export type PostStatus = "idea" | "draft" | "review" | "approved" | "posted";
+export type PostStatus = "idea" | "draft" | "approved" | "posted";
 export type ApprovalStatus =
   | "pending"
   | "approved"

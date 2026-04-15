@@ -538,7 +538,7 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
                 approvalStatus === "approved"
                   ? "approved"
                   : approvalStatus === "needs-revision" || approvalStatus === "rejected"
-                    ? "review"
+                    ? "draft"
                     : post.status,
               comments: nextComments,
               updatedAt: new Date().toISOString(),
