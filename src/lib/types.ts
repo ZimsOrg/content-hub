@@ -1,6 +1,7 @@
 export type TabId =
   | "board"
   | "calendar"
+  | "research"
   | "settings";
 
 export type Platform = "linkedin" | "substack" | "both";
@@ -33,6 +34,7 @@ export interface Idea {
   priority: IdeaPriority;
   status: IdeaStatus;
   tags?: string[];
+  imagePrompt?: string;
   createdAt: string;
   updatedAt: string;
   scheduledPostIds?: string[];
@@ -97,4 +99,24 @@ export interface ContentHubData {
   posts: Post[];
   analytics: AnalyticsEntry[];
   settings: Settings;
+}
+
+export interface CustomOptions {
+  topics: string[];
+  channels: string[];
+  voices: string[];
+  audiences: string[];
+}
+
+export interface ApiKeyEntry {
+  provider: string;
+  label: string;
+  hasKey: boolean;
+}
+
+export interface ResearchConfig {
+  topicSeeds: string[];
+  defaultModel: string;
+  searchModel: string;
+  imageModel: string;
 }

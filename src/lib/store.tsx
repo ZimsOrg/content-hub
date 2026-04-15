@@ -11,6 +11,7 @@ import {
 } from "react";
 import { v4 as uuidv4 } from "uuid";
 
+import { getApprovalStatusForPostStatus, resolveApprovalStatus } from "@/lib/post-approval";
 import { seedContentHubData } from "@/lib/seed-data";
 import type {
   Comment,
@@ -26,7 +27,7 @@ import type {
 
 type NewIdeaInput = Pick<
   Idea,
-  "title" | "description" | "platform" | "postType" | "priority" | "status" | "tags"
+  "title" | "description" | "platform" | "postType" | "priority" | "status" | "tags" | "imagePrompt"
 >;
 
 type NewPostInput = {
@@ -54,6 +55,7 @@ type ContentHubContextValue = {
   updateIdea: (ideaId: string, patch: Partial<Idea>) => void;
   setIdeaStatus: (ideaId: string, status: Idea["status"]) => Promise<void>;
   deleteIdea: (ideaId: string) => void;
+  deletePost: (postId: string) => void;
   addPost: (input: NewPostInput) => void;
   updatePost: (postId: string, patch: Partial<Post>) => void;
   setPostStatus: (postId: string, status: PostStatus) => Promise<void>;
@@ -81,10 +83,15 @@ function getDefaultData(): ContentHubData {
 
 function normalizeData(value: ContentHubData): ContentHubData {
   const defaultData = getDefaultData();
+  const rawPosts = value.posts ?? defaultData.posts;
 
   return {
     ...defaultData,
     ...value,
+    posts: rawPosts.map((post) => ({
+      ...post,
+      approvalStatus: resolveApprovalStatus(post.status, post.approvalStatus),
+    })),
     settings: {
       ...defaultData.settings,
       ...value.settings,
@@ -105,28 +112,12 @@ function applyTheme(theme: ThemePreference) {
   root.style.colorScheme = resolvedTheme;
 }
 
-function getApprovalStatusForPostStatus(
-  status: PostStatus,
-  currentApprovalStatus?: Post["approvalStatus"],
-): Post["approvalStatus"] {
-  if (status === "approved" || status === "posted") {
-    return "approved";
-  }
-
-  if (status === "review") {
-    return currentApprovalStatus === "needs-revision" || currentApprovalStatus === "rejected"
-      ? currentApprovalStatus
-      : "pending";
-  }
-
-  return "pending";
-}
-
 export function ContentHubProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<ContentHubData>(getDefaultData);
   const [isReady, setIsReady] = useState(false);
   const hasLoadedRef = useRef(false);
   const hasInitializedPersistenceRef = useRef(false);
+  const serverSnapshotRef = useRef<ContentHubData | null>(null);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -146,6 +137,7 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
         }
 
         hasLoadedRef.current = true;
+        serverSnapshotRef.current = nextData;
         setData(nextData);
         applyTheme(nextData.settings.theme);
       } catch (error) {
@@ -182,6 +174,15 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const snap = serverSnapshotRef.current;
+    if (snap) {
+      const clientTotal = data.ideas.length + data.posts.length;
+      const serverTotal = snap.ideas.length + snap.posts.length;
+      if (clientTotal === 0 && serverTotal > 0) {
+        return;
+      }
+    }
+
     const timeoutId = window.setTimeout(() => {
       void fetch("/api/data", {
         method: "PUT",
@@ -189,6 +190,8 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
+      }).then(() => {
+        serverSnapshotRef.current = data;
       }).catch((error: unknown) => {
         console.error("Failed to save content hub data:", error);
       });
@@ -228,6 +231,7 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           priority: input.priority,
           status: input.status,
           tags: input.tags?.filter(Boolean),
+          imagePrompt: input.imagePrompt,
           createdAt: timestamp,
           updatedAt: timestamp,
           scheduledPostIds: [],
@@ -288,6 +292,12 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           ideas: current.ideas.filter((idea) => idea.id !== ideaId),
         }));
       },
+      deletePost: (postId) => {
+        setData((current) => ({
+          ...current,
+          posts: current.posts.filter((post) => post.id !== postId),
+        }));
+      },
       addPost: (input) => {
         const timestamp = new Date().toISOString();
         const post: Post = {
@@ -313,7 +323,7 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
 
         setData((current) => ({
           ...current,
-          posts: [...current.posts, post],
+          posts: [post, ...current.posts],
         }));
       },
       updatePost: (postId, patch) => {

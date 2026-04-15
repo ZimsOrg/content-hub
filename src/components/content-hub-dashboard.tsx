@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { createContext, useContext, useEffect, useRef, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
 import {
   addDays,
   addMonths,
@@ -25,21 +25,29 @@ import {
   Circle,
   Clock3,
   Copy,
+  Archive,
+  ArchiveRestore,
   Download,
+  Eye,
+  EyeOff,
   ImageIcon,
+  Key,
   LayoutGrid,
   Link2,
   LoaderCircle,
+  Maximize2,
   Menu,
-  MessageSquareText,
+  Minimize2,
   Moon,
   PanelLeft,
   PencilLine,
   Plus,
+  Search,
   Send,
   Settings2,
   Sparkles,
   Sun,
+  Trash2,
   X,
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -67,12 +75,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useContentHub } from "@/lib/store";
 import type {
+  ApiKeyEntry,
   ApprovalStatus,
+  CustomOptions,
   Idea,
   Platform,
   Post,
   PostPlatform,
   PostType,
+  ResearchConfig,
   TabId,
   ThemePreference,
 } from "@/lib/types";
@@ -88,6 +99,7 @@ const TAB_ITEMS: {
 }[] = [
   { id: "board", label: "Board", icon: LayoutGrid, description: "Content pipeline" },
   { id: "calendar", label: "Calendar", icon: CalendarDays, description: "Publishing schedule" },
+  { id: "research", label: "Research", icon: Search, description: "AI content research" },
   { id: "settings", label: "Settings", icon: Settings2, description: "Preferences" },
 ];
 
@@ -109,33 +121,6 @@ const PLATFORM_META = {
   },
 } as const;
 
-const POST_TYPE_META: Record<PostType, { label: string; dot: string; badge: string }> = {
-  trenches: {
-    label: "Trenches",
-    dot: "bg-emerald-500",
-    badge: "bg-emerald-500/12 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300",
-  },
-  contrarian: {
-    label: "Contrarian",
-    dot: "bg-amber-500",
-    badge: "bg-amber-500/12 text-amber-700 ring-amber-500/20 dark:text-amber-300",
-  },
-  "tool-review": {
-    label: "Tool Review",
-    dot: "bg-violet-500",
-    badge: "bg-violet-500/12 text-violet-700 ring-violet-500/20 dark:text-violet-300",
-  },
-  "free-roundup": {
-    label: "Free Roundup",
-    dot: "bg-teal-500",
-    badge: "bg-teal-500/12 text-teal-700 ring-teal-500/20 dark:text-teal-300",
-  },
-  "paid-deep-dive": {
-    label: "Paid Deep Dive",
-    dot: "bg-yellow-500",
-    badge: "bg-yellow-500/12 text-yellow-700 ring-yellow-500/20 dark:text-yellow-300",
-  },
-};
 
 const PRIORITY_META = {
   high: {
@@ -173,15 +158,6 @@ const APPROVAL_STATUS_META = {
   "needs-revision": "Needs Revision",
 } as const;
 
-const APPROVAL_ACTIONS: {
-  value: ApprovalStatus;
-  label: string;
-  requireComment: boolean;
-}[] = [
-  { value: "approved", label: "Approve", requireComment: false },
-  { value: "needs-revision", label: "Needs Revision", requireComment: true },
-  { value: "rejected", label: "Reject", requireComment: true },
-];
 
 const WEEKDAY_OPTIONS = [
   { value: 0, label: "Sun" },
@@ -463,30 +439,21 @@ function TappableMedia({ src, alt, className }: { src: string; alt: string; clas
 // Keep backward compat alias
 const TappableImage = TappableMedia;
 
-function safeNumber(value: number | undefined) {
-  return value ?? 0;
-}
 
 function postMatchesDate(post: Post, date: Date) {
   return isSameDay(parseISO(post.scheduledAt), date);
 }
 
-function sortPostsByDate(posts: Post[]) {
+function sortPostsByScheduledDate(posts: Post[]) {
   return [...posts].sort(
     (left, right) => parseISO(left.scheduledAt).getTime() - parseISO(right.scheduledAt).getTime(),
   );
 }
 
-function sortIdeasByPriority(ideas: Idea[]) {
-  const order = { high: 0, medium: 1, low: 2 };
-  return [...ideas].sort((left, right) => {
-    const priorityDiff = order[left.priority] - order[right.priority];
-    if (priorityDiff !== 0) {
-      return priorityDiff;
-    }
-
-    return parseISO(right.updatedAt).getTime() - parseISO(left.updatedAt).getTime();
-  });
+function sortByNewest<T extends { createdAt: string }>(items: T[]) {
+  return [...items].sort(
+    (left, right) => parseISO(right.createdAt).getTime() - parseISO(left.createdAt).getTime(),
+  );
 }
 
 function getApprovalTone(status: ApprovalStatus | undefined) {
@@ -520,14 +487,6 @@ function Surface({
     </section>
   );
 }
-
-type MetricsFormState = {
-  impressions: string;
-  comments: string;
-  reposts: string;
-  reactions: string;
-  followerDelta: string;
-};
 
 type CopyPostButtonProps = {
   content: string;
@@ -583,14 +542,6 @@ function PlatformBadge({ platform }: { platform: Platform }) {
   );
 }
 
-function PostTypeBadge({ postType }: { postType: PostType }) {
-  const meta = POST_TYPE_META[postType];
-  return (
-    <Badge className={cn("ring-1 ring-inset", meta.badge)} variant="outline">
-      {meta.label}
-    </Badge>
-  );
-}
 
 function StatusBadge({
   value,
@@ -800,143 +751,6 @@ function ScheduleIdeaDialog({
   );
 }
 
-function DraftActionDialog({
-  post,
-  mode,
-  open,
-  onOpenChange,
-}: {
-  post: Post | null;
-  mode: "edit" | "comment" | ApprovalStatus | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { addComment, savePostContent, setApprovalStatus } = useContentHub();
-  const [content, setContent] = useState(post?.content ?? "");
-  const [comment, setComment] = useState("");
-  const [commentAuthor, setCommentAuthor] = useState<"edo" | "zima">("edo");
-
-  useEffect(() => {
-    setContent(post?.content ?? "");
-    setComment("");
-  }, [post, mode]);
-
-  const config = APPROVAL_ACTIONS.find((action) => action.value === mode);
-  const title =
-    mode === "edit"
-      ? "Edit draft"
-      : mode === "comment"
-        ? "Add feedback"
-        : config?.label ?? "Update draft";
-  const description =
-    mode === "edit"
-      ? "Save a new revision. The previous version is stored automatically."
-      : mode === "comment"
-        ? "Capture feedback for the draft thread."
-        : config?.requireComment
-          ? "A reason is required for this decision."
-          : "Confirm the approval status update.";
-
-  function close() {
-    setComment("");
-    onOpenChange(false);
-  }
-
-  function handleSubmit() {
-    if (!post || !mode) {
-      return;
-    }
-
-    if (mode === "edit") {
-      savePostContent(post.id, content);
-      close();
-      return;
-    }
-
-    if (mode === "comment") {
-      addComment(post.id, comment, commentAuthor);
-      close();
-      return;
-    }
-
-    if (config?.requireComment && !comment.trim()) {
-      return;
-    }
-
-    setApprovalStatus(post.id, mode, comment);
-    close();
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-lg">{title}</DialogTitle>
-        </DialogHeader>
-        {mode === "edit" ? (
-          <Textarea
-            className="min-h-72 text-base leading-7"
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-          />
-        ) : (
-          <div className="space-y-3">
-            {mode === "comment" ? (
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground">As</span>
-                <div className="inline-flex rounded-xl border border-border/40 bg-muted/30 p-0.5">
-                  {(["edo", "zima"] as const).map((author) => (
-                    <button
-                      key={author}
-                      type="button"
-                      className={cn(
-                        "min-h-11 rounded-[10px] px-4 py-1 text-sm font-medium transition",
-                        commentAuthor === author
-                          ? "bg-foreground text-background shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                      onClick={() => setCommentAuthor(author)}
-                    >
-                      {author === "edo" ? "Edo" : "Zima"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <Textarea
-              className="min-h-36 text-base"
-              placeholder={
-                config?.requireComment
-                  ? "Explain the rejection or revision request"
-                  : "Leave a note"
-              }
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-            />
-          </div>
-        )}
-        <DialogFooter>
-          <Button
-            className="h-12 text-base"
-            disabled={
-              mode === "comment"
-                ? !comment.trim()
-                : Boolean(config?.requireComment && !comment.trim())
-            }
-            onClick={handleSubmit}
-          >
-            {mode === "edit" ? <PencilLine /> : <Check />}
-            Save
-          </Button>
-          <Button variant="outline" className="h-12 text-base" onClick={close}>
-            Cancel
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function PreviewText({
   children,
   className,
@@ -959,125 +773,107 @@ function PreviewText({
   );
 }
 
-function PostMetricsGrid({ post }: { post: Post }) {
-  return (
-    <div className="grid grid-cols-2 gap-3 text-sm">
-      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-        <div className="text-muted-foreground">Impressions</div>
-        <div className="text-xl font-semibold">
-          {safeNumber(post.metrics?.impressions).toLocaleString()}
-        </div>
-      </div>
-      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-        <div className="text-muted-foreground">Comments</div>
-        <div className="text-xl font-semibold">
-          {safeNumber(post.metrics?.comments).toLocaleString()}
-        </div>
-      </div>
-      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-        <div className="text-muted-foreground">Reposts</div>
-        <div className="text-xl font-semibold">
-          {safeNumber(post.metrics?.reposts).toLocaleString()}
-        </div>
-      </div>
-      <div className="rounded-2xl border border-border/40 bg-background/60 p-3">
-        <div className="text-muted-foreground">Reactions</div>
-        <div className="text-xl font-semibold">
-          {safeNumber(post.metrics?.reactions).toLocaleString()}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeedbackThread({ post }: { post: Post }) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-base font-medium">Feedback thread</p>
-        <span className="text-xs text-muted-foreground">{post.comments.length} comments</span>
-      </div>
-
-      {post.comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No comments yet.</p>
-      ) : (
-        <div className="space-y-4">
-          {post.comments.map((comment) => (
-            <div key={comment.id} className="space-y-1 border-b border-border/40 pb-4 last:border-b-0 last:pb-0">
-              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  {comment.author === "edo" ? "Edo" : "Zima"}
-                </span>
-                <span>{format(parseISO(comment.createdAt), "MMM d, p")}</span>
-              </div>
-              <p className="text-base leading-7">{comment.text}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BoardPostActions({
-  post,
-  onOpenAction,
-  onOpenMetrics,
+function EditableContentBlock({
+  label,
+  value,
+  onSave,
+  placeholder,
 }: {
-  post: Post;
-  onOpenAction: (postId: string, mode: "edit" | "comment" | ApprovalStatus) => void;
-  onOpenMetrics: (postId: string) => void;
+  label: string;
+  value: string;
+  onSave: (next: string) => void;
+  placeholder?: string;
 }) {
-  if (post.status === "posted") {
+  const id = useId();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function save() {
+    if (draft !== value) {
+      onSave(draft);
+    }
+    setEditing(false);
+    setExpanded(false);
+  }
+
+  function cancel() {
+    setDraft(value);
+    setEditing(false);
+    setExpanded(false);
+  }
+
+  if (!editing) {
     return (
-      <>
-        <PostMetricsGrid post={post} />
-        <Button
-          variant="outline"
-          className="h-11 w-full justify-center border-border/40"
-          onClick={() => onOpenMetrics(post.id)}
-        >
-          <PencilLine />
-          Enter Metrics
-        </Button>
-      </>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-foreground">{label}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setEditing(true)}
+          >
+            <PencilLine className="size-3.5" />
+            Edit
+          </Button>
+        </div>
+        <pre className="font-sans whitespace-pre-wrap break-words overflow-hidden text-base leading-7 text-foreground">
+          {value || placeholder || "Nothing yet."}
+        </pre>
+      </div>
     );
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {post.approvalStatus !== "approved" ? (
-        <Button className="h-11 w-full justify-center" onClick={() => onOpenAction(post.id, "approved")}>
-          <Check />
-          Approve
-        </Button>
-      ) : null}
-      <Button
-        variant="outline"
-        className="h-11 w-full justify-center border-border/40"
-        onClick={() => onOpenAction(post.id, "edit")}
-      >
-        <PencilLine />
-        Edit
-      </Button>
-      <Button
-        variant="outline"
-        className="h-11 w-full justify-center border-border/40"
-        onClick={() => onOpenAction(post.id, "comment")}
-      >
-        <MessageSquareText />
-        Comment
-      </Button>
-      {post.approvalStatus !== "rejected" ? (
-        <Button
-          variant="destructive"
-          className="h-11 w-full justify-center"
-          onClick={() => onOpenAction(post.id, "rejected")}
-        >
-          <X />
-          Reject
-        </Button>
-      ) : null}
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor={id} className="text-sm font-medium text-foreground">
+          {label}
+        </label>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1 px-2 text-muted-foreground hover:text-foreground"
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            {expanded ? "Collapse" : "Expand"}
+          </Button>
+          <Button type="button" size="sm" className="h-8" onClick={save}>
+            Save
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="h-8" onClick={cancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+      <Textarea
+        id={id}
+        value={draft}
+        placeholder={placeholder}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+            event.preventDefault();
+            save();
+          }
+        }}
+        className={cn(
+          "w-full resize-y font-sans text-base leading-7 transition-[max-height] duration-200",
+          expanded
+            ? "min-h-[16rem] max-h-[min(75vh,40rem)]"
+            : "min-h-[8rem] max-h-[16rem]",
+        )}
+      />
+      <p className="text-xs text-muted-foreground">⌘/Ctrl + Enter to save</p>
     </div>
   );
 }
@@ -1090,8 +886,10 @@ function BoardCardDialog({
   onScheduleIdea,
   onMoveIdeaStatus,
   onMovePostStatus,
-  onOpenPostAction,
-  onOpenMetrics,
+  onArchiveIdea,
+  onArchivePost,
+  onDeleteIdea,
+  onDeletePost,
 }: {
   idea: Idea | null;
   post: Post | null;
@@ -1100,9 +898,12 @@ function BoardCardDialog({
   onScheduleIdea: (idea: Idea) => void;
   onMoveIdeaStatus: (ideaId: string, status: Idea["status"]) => void;
   onMovePostStatus: (postId: string, status: Post["status"]) => void;
-  onOpenPostAction: (postId: string, mode: "edit" | "comment" | ApprovalStatus) => void;
-  onOpenMetrics: (postId: string) => void;
+  onArchiveIdea: (ideaId: string, archived: boolean) => void;
+  onArchivePost: (postId: string, archived: boolean) => void;
+  onDeleteIdea: (ideaId: string) => void;
+  onDeletePost: (postId: string) => void;
 }) {
+  const { savePostContent, updateIdea, updatePost } = useContentHub();
   const activeIdea = idea;
   const activePost = post;
 
@@ -1119,15 +920,20 @@ function BoardCardDialog({
                   {PRIORITY_META[activeIdea.priority].label}
                 </Badge>
                 <PlatformBadge platform={activeIdea.platform} />
-                <PostTypeBadge postType={activeIdea.postType} />
-                <StatusBadge value={activeIdea.status} />
               </div>
             </DialogHeader>
 
             <div className="space-y-5">
-              <pre className="font-sans whitespace-pre-wrap break-words overflow-hidden text-base leading-7 text-foreground">
-                {activeIdea.description || "No description yet."}
-              </pre>
+              <EditableContentBlock
+                label="Description"
+                value={activeIdea.description ?? ""}
+                placeholder="Add a description…"
+                onSave={(next) => updateIdea(activeIdea.id, { description: next })}
+              />
+
+              {activeIdea.imagePrompt ? (
+                <ImagePromptBlock prompt={activeIdea.imagePrompt} />
+              ) : null}
 
               {(activeIdea.tags ?? []).length > 0 ? (
                 <div className="flex flex-wrap gap-2">
@@ -1145,11 +951,24 @@ function BoardCardDialog({
                 Add to Calendar
               </Button>
 
-              <CardStatusSelect
-                value={activeIdea.status}
-                options={IDEA_STATUS_OPTIONS}
-                onChange={(status) => onMoveIdeaStatus(activeIdea.id, status as Idea["status"])}
-              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="h-11 flex-1 border-border/40 gap-2"
+                  onClick={() => { onArchiveIdea(activeIdea.id, !activeIdea.archived); onOpenChange(false); }}
+                >
+                  {activeIdea.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                  {activeIdea.archived ? "Unarchive" : "Archive"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11 border-border/40 gap-2 text-destructive hover:bg-destructive/10"
+                  onClick={() => { onDeleteIdea(activeIdea.id); onOpenChange(false); }}
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </Button>
+              </div>
             </div>
           </>
         ) : null}
@@ -1160,26 +979,44 @@ function BoardCardDialog({
               <DialogTitle className="text-xl leading-tight">{activePost.title}</DialogTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <PlatformBadge platform={activePost.platform} />
-                <PostTypeBadge postType={activePost.postType} />
                 <StatusBadge value={activePost.status} />
-                {activePost.approvalStatus ? <StatusBadge value={activePost.approvalStatus} /> : null}
-                <span className="text-sm text-muted-foreground">
-                  {format(parseISO(activePost.scheduledAt), "MMM d")}
-                </span>
+                {(activePost.status === "approved" || activePost.status === "posted") && (
+                  <span className="text-sm text-muted-foreground">
+                    {format(parseISO(activePost.scheduledAt), "MMM d")}
+                  </span>
+                )}
               </div>
             </DialogHeader>
 
             <div className="space-y-5">
-              {activePost.approvalStatus ? (
-                <div className={cn("rounded-2xl border px-4 py-3 text-base font-medium", getApprovalTone(activePost.approvalStatus))}>
-                  {APPROVAL_STATUS_META[activePost.approvalStatus]}
-                </div>
-              ) : null}
-
               <CardStatusSelect
                 value={activePost.status}
                 options={POST_STATUS_OPTIONS}
                 onChange={(status) => onMovePostStatus(activePost.id, status as Post["status"])}
+              />
+
+              {(activePost.status === "approved" || activePost.status === "posted") && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Posting Date</label>
+                  <Input
+                    type="date"
+                    className="h-11"
+                    value={activePost.scheduledAt.substring(0, 10)}
+                    onChange={(e) => {
+                      const d = new Date(e.target.value + "T09:00:00");
+                      if (!isNaN(d.getTime())) {
+                        updatePost(activePost.id, { scheduledAt: d.toISOString() });
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
+              <EditableContentBlock
+                label="Content"
+                value={activePost.content}
+                placeholder="Write or paste your post…"
+                onSave={(next) => savePostContent(activePost.id, next)}
               />
 
               <div className="flex flex-wrap gap-2">
@@ -1188,6 +1025,7 @@ function BoardCardDialog({
                   <Button
                     variant="outline"
                     className="h-11 w-full border-border/40 sm:w-auto"
+                    nativeButton={false}
                     render={<a href={activePost.imageUrl} download={getImageDownloadName(activePost)} />}
                   >
                     <Download />
@@ -1195,10 +1033,6 @@ function BoardCardDialog({
                   </Button>
                 ) : null}
               </div>
-
-              <pre className="font-sans whitespace-pre-wrap break-words overflow-hidden text-base leading-7 text-foreground">
-                {activePost.content}
-              </pre>
 
               {activePost.imageUrl ? (
                 <div className="overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
@@ -1210,9 +1044,24 @@ function BoardCardDialog({
                 </div>
               ) : null}
 
-              <BoardPostActions post={activePost} onOpenAction={onOpenPostAction} onOpenMetrics={onOpenMetrics} />
-
-              <FeedbackThread post={activePost} />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="h-11 flex-1 border-border/40 gap-2"
+                  onClick={() => { onArchivePost(activePost.id, !activePost.archived); onOpenChange(false); }}
+                >
+                  {activePost.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                  {activePost.archived ? "Unarchive" : "Archive"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11 border-border/40 gap-2 text-destructive hover:bg-destructive/10"
+                  onClick={() => { onDeletePost(activePost.id); onOpenChange(false); }}
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </Button>
+              </div>
             </div>
           </>
         ) : null}
@@ -1254,7 +1103,6 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <PlatformBadge platform={post.platform} />
-                    <PostTypeBadge postType={post.postType} />
                     <StatusBadge value={post.status} />
                   </div>
                   <p className="text-lg font-semibold leading-7">{post.title}</p>
@@ -1283,6 +1131,7 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
                   <Button
                     variant="outline"
                     className="h-12 w-full text-base border-border/40"
+                    nativeButton={false}
                     render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
                   >
                     <Download />
@@ -1314,7 +1163,7 @@ function CalendarView() {
   const calendarPosts = data.posts.filter(
     (post) => post.approvalStatus === "approved" || post.status === "posted",
   );
-  const agenda = sortPostsByDate(calendarPosts.filter((post) => postMatchesDate(post, selectedDate)));
+  const agenda = sortPostsByScheduledDate(calendarPosts.filter((post) => postMatchesDate(post, selectedDate)));
   const calendarLabel =
     calendarMode === "month"
       ? format(month, "MMMM yyyy")
@@ -1414,7 +1263,7 @@ function CalendarView() {
 
         <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {days.map((date) => {
-            const posts = sortPostsByDate(calendarPosts.filter((post) => postMatchesDate(post, date)));
+            const posts = sortPostsByScheduledDate(calendarPosts.filter((post) => postMatchesDate(post, date)));
             const isActive = isSameDay(date, selectedDate);
 
             return (
@@ -1510,27 +1359,191 @@ function CalendarView() {
   );
 }
 
+function NewCardDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { addIdea, addPost } = useContentHub();
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [platform, setPlatform] = useState<Platform>("linkedin");
+  const [postType, setPostType] = useState<PostType>("trenches");
+  const [priority, setPriority] = useState<"high" | "medium" | "low">("medium");
+  const [status, setStatus] = useState<PostStatus>("idea");
+  const [scheduledAt, setScheduledAt] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+    return d.toISOString();
+  });
+
+  function reset() {
+    setTitle("");
+    setContent("");
+    setPlatform("linkedin");
+    setPostType("trenches");
+    setPriority("medium");
+    setStatus("idea");
+  }
+
+  function handleSubmit() {
+    if (!title.trim()) return;
+
+    if (status === "idea") {
+      addIdea({
+        title: title.trim(),
+        description: content.trim() || undefined,
+        platform,
+        postType,
+        priority,
+        status: "new",
+        tags: [],
+      });
+    } else {
+      addPost({
+        title: title.trim(),
+        content: content.trim(),
+        platform: platform === "both" ? "linkedin" : platform,
+        postType,
+        scheduledAt,
+        status,
+      });
+    }
+
+    reset();
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-lg">New Card</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Status</label>
+            <div className="flex flex-wrap gap-2">
+              {POST_STATUS_OPTIONS.map((opt) => (
+                <Button
+                  key={opt.value}
+                  variant={status === opt.value ? "default" : "outline"}
+                  className="h-10"
+                  onClick={() => setStatus(opt.value)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Title</label>
+            <Input
+              className="h-11"
+              placeholder="What's on your mind?"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Content <span className="font-normal text-muted-foreground">(optional)</span></label>
+            <Textarea
+              className="min-h-[6rem] resize-y text-base leading-7"
+              placeholder="Describe the idea or write the post…"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Platform</label>
+            <select
+              className="h-11 w-full rounded-lg border border-border/50 bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value as Platform)}
+            >
+              <option value="both">Both</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="substack">Substack</option>
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Priority</label>
+            <div className="flex gap-2">
+              {(["high", "medium", "low"] as const).map((p) => (
+                <Button
+                  key={p}
+                  variant={priority === p ? "default" : "outline"}
+                  className="h-10 flex-1"
+                  onClick={() => setPriority(p)}
+                >
+                  {PRIORITY_META[p].label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {(status === "approved" || status === "posted") ? (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Posting Date</label>
+              <Input
+                type="date"
+                className="h-11"
+                value={scheduledAt.substring(0, 10)}
+                onChange={(e) => {
+                  const d = new Date(e.target.value + "T09:00:00");
+                  if (!isNaN(d.getTime())) setScheduledAt(d.toISOString());
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button className="h-12 text-base" disabled={!title.trim()} onClick={handleSubmit}>
+            <Plus className="size-4" />
+            Add Card
+          </Button>
+          <Button variant="outline" className="h-12 text-base" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function BoardView() {
-  const { data, setApprovalStatus, saveMetrics, setIdeaStatus, setPostStatus } = useContentHub();
+  const { data, setIdeaStatus, setPostStatus, scheduleIdea, deleteIdea, deletePost, archiveIdea, archivePost, unarchiveIdea, unarchivePost } = useContentHub();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<"idea" | "post" | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
-  const [selectedActionPostId, setSelectedActionPostId] = useState<string | null>(null);
-  const [dialogMode, setDialogMode] = useState<"edit" | "comment" | ApprovalStatus | null>(null);
-  const [selectedMetricsPostId, setSelectedMetricsPostId] = useState<string | null>(null);
   const [savingStatusKey, setSavingStatusKey] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState<MetricsFormState>({
-    impressions: "",
-    comments: "",
-    reposts: "",
-    reactions: "",
-    followerDelta: "",
-  });
-  const ideas = sortIdeasByPriority(
-    data.ideas.filter((idea) => idea.status === "new" || idea.status === "developing"),
+  const [showArchived, setShowArchived] = useState(false);
+  const [newCardOpen, setNewCardOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; type: "idea" | "post"; title: string } | null>(null);
+
+  function confirmDelete(id: string, type: "idea" | "post", title: string) {
+    setPendingDelete({ id, type, title });
+  }
+
+  function executeDelete() {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === "idea") deleteIdea(pendingDelete.id);
+    else deletePost(pendingDelete.id);
+    setPendingDelete(null);
+  }
+  const ideas = sortByNewest(
+    data.ideas.filter((idea) => showArchived || !idea.archived),
   );
-  const selectedActionPost = data.posts.find((post) => post.id === selectedActionPostId) ?? null;
-  const selectedMetricsPost = data.posts.find((post) => post.id === selectedMetricsPostId) ?? null;
+  const archivedCount =
+    data.ideas.filter((i) => i.archived).length +
+    data.posts.filter((p) => p.archived).length;
   const selectedDialogIdea =
     selectedCardType === "idea" ? data.ideas.find((idea) => idea.id === selectedCardId) ?? null : null;
   const selectedDialogPost =
@@ -1579,8 +1592,8 @@ function BoardView() {
       tone: "bg-amber-500/10",
       cardBorder: "bg-amber-50/60 dark:bg-amber-950/20",
       empty: "No pending drafts",
-      posts: sortPostsByDate(
-        data.posts.filter((post) => post.status === "draft" && post.approvalStatus === "pending"),
+      posts: sortByNewest(
+        data.posts.filter((post) => post.status === "draft" && post.approvalStatus === "pending" && (showArchived || !post.archived)),
       ),
     },
     {
@@ -1589,8 +1602,8 @@ function BoardView() {
       tone: "bg-orange-500/10",
       cardBorder: "bg-orange-50/60 dark:bg-orange-950/20",
       empty: "Nothing needs review",
-      posts: sortPostsByDate(
-        data.posts.filter((post) => post.status === "review" || post.approvalStatus === "needs-revision"),
+      posts: sortByNewest(
+        data.posts.filter((post) => (post.status === "review" || post.approvalStatus === "needs-revision") && (showArchived || !post.archived)),
       ),
     },
     {
@@ -1599,8 +1612,8 @@ function BoardView() {
       tone: "bg-emerald-500/10",
       cardBorder: "bg-emerald-50/60 dark:bg-emerald-950/20",
       empty: "No approved content waiting",
-      posts: sortPostsByDate(
-        data.posts.filter((post) => post.approvalStatus === "approved" && post.status !== "posted"),
+      posts: sortByNewest(
+        data.posts.filter((post) => post.approvalStatus === "approved" && post.status !== "posted" && (showArchived || !post.archived)),
       ),
     },
     {
@@ -1609,55 +1622,40 @@ function BoardView() {
       tone: "bg-blue-500/10",
       cardBorder: "bg-blue-50/60 dark:bg-blue-950/20",
       empty: "No posted content yet",
-      posts: sortPostsByDate(data.posts.filter((post) => post.status === "posted")),
+      posts: sortByNewest(data.posts.filter((post) => post.status === "posted" && (showArchived || !post.archived))),
     },
   ];
-
-  function openDialog(postId: string, mode: "edit" | "comment" | ApprovalStatus) {
-    const config = APPROVAL_ACTIONS.find((action) => action.value === mode);
-    if (config && !config.requireComment) {
-      setApprovalStatus(postId, mode as Post["approvalStatus"]);
-      return;
-    }
-
-    setSelectedActionPostId(postId);
-    setDialogMode(mode);
-  }
 
   function openCardDialog(cardId: string, cardType: "idea" | "post") {
     setSelectedCardId(cardId);
     setSelectedCardType(cardType);
   }
 
-  function openMetrics(postId: string) {
-    const post = data.posts.find((entry) => entry.id === postId);
-    setSelectedMetricsPostId(postId);
-    setMetrics({
-      impressions: String(post?.metrics?.impressions ?? ""),
-      comments: String(post?.metrics?.comments ?? ""),
-      reposts: String(post?.metrics?.reposts ?? ""),
-      reactions: String(post?.metrics?.reactions ?? ""),
-      followerDelta: String(post?.metrics?.followerDelta ?? ""),
-    });
-  }
-
-  function submitMetrics() {
-    if (!selectedMetricsPost) {
-      return;
-    }
-
-    saveMetrics(selectedMetricsPost.id, {
-      impressions: Number(metrics.impressions || 0),
-      comments: Number(metrics.comments || 0),
-      reposts: Number(metrics.reposts || 0),
-      reactions: Number(metrics.reactions || 0),
-      followerDelta: Number(metrics.followerDelta || 0),
-    });
-    setSelectedMetricsPostId(null);
-  }
-
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          className="h-10 gap-2"
+          onClick={() => setNewCardOpen(true)}
+        >
+          <Plus className="size-4" />
+          New
+        </Button>
+        <Button
+          variant={showArchived ? "default" : "outline"}
+          className="h-10 gap-2 border-border/40"
+          onClick={() => setShowArchived(!showArchived)}
+        >
+          <Archive className="size-4" />
+          Archived
+          {archivedCount > 0 && (
+            <span className="flex size-5 items-center justify-center rounded-full bg-foreground/10 text-xs font-semibold">
+              {archivedCount}
+            </span>
+          )}
+        </Button>
+      </div>
+
       {columns.every((column) => (column.ideas?.length ?? column.posts?.length ?? 0) === 0) ? (
         <EmptyState
           icon={LayoutGrid}
@@ -1685,37 +1683,79 @@ function BoardView() {
 
               <div className="mt-3 flex flex-col gap-3">
                 {column.ideas?.map((idea) => {
-                  const isSaving = savingStatusKey === `idea:${idea.id}`;
-
+                  const isArchived = idea.archived;
                   return (
-                    <Surface key={idea.id} className={cn("w-full overflow-hidden p-0", column.cardBorder)}>
-                      <div className="p-4 lg:p-5">
+                    <Surface key={idea.id} className={cn("w-full overflow-hidden p-0", column.cardBorder, isArchived && "opacity-60")}>
+                      <div className="p-4 sm:p-5 lg:p-6">
                         <button
                           type="button"
-                          className="flex min-h-11 w-full items-start justify-between gap-3 text-left"
+                          className="flex min-w-0 w-full items-start justify-between gap-3 text-left"
                           onClick={() => openCardDialog(idea.id, "idea")}
                         >
                           <div className="min-w-0">
                             <p className="text-lg font-semibold leading-7">{idea.title}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
                               <Badge className={cn("ring-1 ring-inset", PRIORITY_META[idea.priority].badge)} variant="outline">
                                 {PRIORITY_META[idea.priority].label}
                               </Badge>
                               <PlatformBadge platform={idea.platform} />
-                              <StatusBadge value={idea.status} />
+                              {isArchived && (
+                                <Badge variant="outline" className="gap-1 ring-1 ring-inset ring-border/40 text-muted-foreground">
+                                  <Archive className="size-3" /> Archived
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </button>
+                        {idea.imagePrompt ? (
+                          <div className="mt-3">
+                            <ImagePromptBlock prompt={idea.imagePrompt} />
+                          </div>
+                        ) : null}
                         <div className="mt-4 flex items-center justify-between gap-3">
                           <CardStatusSelect
-                            value={idea.status}
-                            options={IDEA_STATUS_OPTIONS}
-                            disabled={isSaving}
+                            value="idea"
+                            options={POST_STATUS_OPTIONS}
                             onChange={(status) => {
-                              void handleIdeaStatusChange(idea.id, status as Idea["status"]);
+                              if (status !== "idea") {
+                                const plat = idea.platform === "both" ? "linkedin" : idea.platform;
+                                const tomorrow = new Date();
+                                tomorrow.setDate(tomorrow.getDate() + 1);
+                                tomorrow.setHours(9, 0, 0, 0);
+                                scheduleIdea({
+                                  ideaId: idea.id,
+                                  title: idea.title,
+                                  content: idea.description ?? "",
+                                  scheduledAt: tomorrow.toISOString(),
+                                  platform: plat as PostPlatform,
+                                });
+                                if (status !== "draft") {
+                                  const newPost = data.posts.find((p) => p.ideaId === idea.id);
+                                  if (newPost) {
+                                    void handlePostStatusChange(newPost.id, status as Post["status"]);
+                                  }
+                                }
+                              }
                             }}
                           />
-                          {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
+                          <Button
+                            variant="ghost"
+                            size="icon-lg"
+                            className="size-9 text-muted-foreground hover:text-foreground"
+                            onClick={(e: MouseEvent) => { e.stopPropagation(); isArchived ? unarchiveIdea(idea.id) : archiveIdea(idea.id); }}
+                            title={isArchived ? "Unarchive" : "Archive"}
+                          >
+                            {isArchived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-lg"
+                            className="size-9 text-muted-foreground hover:text-destructive"
+                            onClick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(idea.id, "idea", idea.title); }}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
                         </div>
                       </div>
                     </Surface>
@@ -1724,9 +1764,10 @@ function BoardView() {
 
                 {column.posts?.map((post) => {
                   const isSaving = savingStatusKey === `post:${post.id}`;
+                  const isArchived = post.archived;
 
                   return (
-                    <Surface key={post.id} className={cn("w-full overflow-hidden p-0", column.cardBorder)}>
+                    <Surface key={post.id} className={cn("w-full overflow-hidden p-0", column.cardBorder, isArchived && "opacity-60")}>
                       <div className="p-4 sm:p-5 lg:p-6">
                         <div className="flex items-start gap-3">
                           <button
@@ -1738,10 +1779,16 @@ function BoardView() {
                               <p className="text-lg font-semibold leading-7">{post.title}</p>
                               <div className="mt-3 flex flex-wrap items-center gap-2">
                                 <PlatformBadge platform={post.platform} />
-                                {post.approvalStatus ? <StatusBadge value={post.approvalStatus} /> : null}
-                                <span className="text-base text-muted-foreground">
-                                  {format(parseISO(post.scheduledAt), "MMM d")}
-                                </span>
+                                {(post.status === "approved" || post.status === "posted") && (
+                                  <span className="text-base text-muted-foreground">
+                                    {format(parseISO(post.scheduledAt), "MMM d")}
+                                  </span>
+                                )}
+                                {isArchived && (
+                                  <Badge variant="outline" className="gap-1 ring-1 ring-inset ring-border/40 text-muted-foreground">
+                                    <Archive className="size-3" /> Archived
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </button>
@@ -1773,7 +1820,27 @@ function BoardView() {
                               void handlePostStatusChange(post.id, status as Post["status"]);
                             }}
                           />
-                          {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
+                          <div className="flex items-center gap-1.5">
+                            {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
+                            <Button
+                              variant="ghost"
+                              size="icon-lg"
+                              className="size-9 text-muted-foreground hover:text-foreground"
+                              onClick={(e: MouseEvent) => { e.stopPropagation(); isArchived ? unarchivePost(post.id) : archivePost(post.id); }}
+                              title={isArchived ? "Unarchive" : "Archive"}
+                            >
+                              {isArchived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-lg"
+                              className="size-9 text-muted-foreground hover:text-destructive"
+                              onClick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(post.id, "post", post.title); }}
+                              title="Delete"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </Surface>
@@ -1812,28 +1879,10 @@ function BoardView() {
         onMovePostStatus={(postId, status) => {
           void handlePostStatusChange(postId, status);
         }}
-        onOpenPostAction={(postId, mode) => {
-          setSelectedCardId(null);
-          setSelectedCardType(null);
-          openDialog(postId, mode);
-        }}
-        onOpenMetrics={(postId) => {
-          setSelectedCardId(null);
-          setSelectedCardType(null);
-          openMetrics(postId);
-        }}
-      />
-
-      <DraftActionDialog
-        post={selectedActionPost}
-        mode={dialogMode}
-        open={Boolean(selectedActionPost && dialogMode)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDialogMode(null);
-            setSelectedActionPostId(null);
-          }
-        }}
+        onArchiveIdea={(ideaId, archived) => { archived ? archiveIdea(ideaId) : unarchiveIdea(ideaId); }}
+        onArchivePost={(postId, archived) => { archived ? archivePost(postId) : unarchivePost(postId); }}
+        onDeleteIdea={(id) => { const i = data.ideas.find((x) => x.id === id); confirmDelete(id, "idea", i?.title ?? ""); }}
+        onDeletePost={(id) => { const p = data.posts.find((x) => x.id === id); confirmDelete(id, "post", p?.title ?? ""); }}
       />
 
       <ScheduleIdeaDialog
@@ -1846,40 +1895,26 @@ function BoardView() {
         }}
       />
 
-      <Dialog open={Boolean(selectedMetricsPost)} onOpenChange={(open) => !open && setSelectedMetricsPostId(null)}>
-        <DialogContent className="sm:max-w-md">
+      <NewCardDialog open={newCardOpen} onOpenChange={setNewCardOpen} />
+
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-lg">Update Metrics</DialogTitle>
+            <DialogTitle className="text-lg">Delete card?</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            {(
-              [
-                ["impressions", "Impressions"],
-                ["comments", "Comments"],
-                ["reposts", "Reposts"],
-                ["reactions", "Reactions"],
-                ["followerDelta", "Follower Δ"],
-              ] as const
-            ).map(([key, label]) => (
-              <div key={key} className="space-y-2">
-                <label className="text-sm font-medium">{label}</label>
-                <Input
-                  className="h-12 text-base"
-                  inputMode="numeric"
-                  value={metrics[key]}
-                  onChange={(event) =>
-                    setMetrics((current) => ({ ...current, [key]: event.target.value }))
-                  }
-                />
-              </div>
-            ))}
-          </div>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{pendingDelete?.title}</span> will be permanently deleted. This cannot be undone.
+          </p>
           <DialogFooter>
-            <Button className="h-12 text-base" onClick={submitMetrics}>
-              <Check />
-              Save metrics
+            <Button
+              variant="destructive"
+              className="h-11 text-base"
+              onClick={() => { executeDelete(); }}
+            >
+              <Trash2 className="size-4" />
+              Delete
             </Button>
-            <Button variant="outline" className="h-12 text-base" onClick={() => setSelectedMetricsPostId(null)}>
+            <Button variant="outline" className="h-11 text-base" onClick={() => setPendingDelete(null)}>
               Cancel
             </Button>
           </DialogFooter>
@@ -2000,6 +2035,629 @@ function SettingsView() {
             ))}
           </CardContent>
         </Card>
+
+        <CustomOptionsSettingsSection />
+        <OpenRouterKeySection />
+        <ModelsSection />
+    </div>
+  );
+}
+
+function OpenRouterKeySection() {
+  const [hasKey, setHasKey] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/keys")
+      .then((r) => r.json())
+      .then((data: ApiKeyEntry[]) => {
+        const entry = data.find((e) => e.provider === "openrouter");
+        setHasKey(entry?.hasKey ?? false);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function saveKey() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/keys", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "openrouter", key: keyInput }),
+      });
+      const updated: ApiKeyEntry[] = await res.json();
+      const entry = updated.find((e) => e.provider === "openrouter");
+      setHasKey(entry?.hasKey ?? false);
+      setEditing(false);
+      setKeyInput("");
+      setShowKey(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeKey() {
+    const res = await fetch("/api/settings/keys", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "openrouter", key: "" }),
+    });
+    const updated: ApiKeyEntry[] = await res.json();
+    const entry = updated.find((e) => e.provider === "openrouter");
+    setHasKey(entry?.hasKey ?? false);
+  }
+
+  return (
+    <Card className="border border-border/40 bg-card/80 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Key className="size-5" /> OpenRouter API Key</CardTitle>
+        <CardDescription>All AI features use OpenRouter. Enter your API key to enable research and generation.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" /> Loading…
+          </div>
+        ) : editing ? (
+          <div className="space-y-3">
+            <div className="relative">
+              <Input
+                className="h-11 pr-10 font-mono text-sm"
+                type={showKey ? "text" : "password"}
+                placeholder="sk-or-v1-…"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && keyInput.trim()) saveKey(); }}
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowKey(!showKey)}
+              >
+                {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <Button className="h-10" disabled={saving || !keyInput.trim()} onClick={saveKey}>Save</Button>
+              <Button variant="outline" className="h-10" onClick={() => { setEditing(false); setKeyInput(""); setShowKey(false); }}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/40 px-4 py-3">
+            <div>
+              <p className="font-medium">OpenRouter</p>
+              <p className="text-xs text-muted-foreground">{hasKey ? "Key configured" : "Not set"}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-9" onClick={() => { setEditing(true); setKeyInput(""); setShowKey(false); }}>
+                {hasKey ? "Update" : "Add Key"}
+              </Button>
+              {hasKey && (
+                <Button size="sm" variant="ghost" className="h-9 text-muted-foreground hover:text-destructive" onClick={removeKey}>
+                  <Trash2 className="size-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ModelsSection() {
+  const [config, setConfig] = useState<ResearchConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/settings/research-config")
+      .then((res) => res.json())
+      .then((data) => { setConfig(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function save(patch: Partial<ResearchConfig>) {
+    const res = await fetch("/api/settings/research-config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const updated = await res.json();
+    setConfig(updated);
+  }
+
+  if (loading || !config) {
+    return (
+      <Card className="border border-border/40 bg-card/80 backdrop-blur">
+        <CardContent className="py-6">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" /> Loading models…
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border border-border/40 bg-card/80 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Sparkles className="size-5" /> Models (OpenRouter)</CardTitle>
+        <CardDescription>Enter OpenRouter model names for each task. All calls go through your OpenRouter key.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {([
+            ["defaultModel", "Default / Writing", "anthropic/claude-sonnet-4"],
+            ["searchModel", "Search / Research", "perplexity/sonar-pro"],
+            ["imageModel", "Image Generation", "openai/dall-e-3"],
+          ] as const).map(([field, label, placeholder]) => (
+            <div key={field} className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">{label}</label>
+              <Input
+                className="h-10 text-sm font-mono"
+                placeholder={placeholder}
+                value={config[field]}
+                onChange={(e) => setConfig({ ...config, [field]: e.target.value })}
+                onBlur={() => save({ [field]: config[field] })}
+              />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function useCustomOptions() {
+  const [options, setOptions] = useState<CustomOptions>({ topics: [], channels: [], voices: [], audiences: [] });
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/custom-options")
+      .then((r) => r.json())
+      .then((d) => { setOptions(d); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  async function saveOptions(patch: Partial<CustomOptions>) {
+    const merged = { ...options, ...patch };
+    setOptions(merged);
+    const res = await fetch("/api/settings/custom-options", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const updated = await res.json();
+    if (!("error" in updated)) setOptions(updated);
+  }
+
+  return { options, loaded, saveOptions };
+}
+
+function EditableTagList({
+  label,
+  description,
+  items,
+  onAdd,
+  onRemove,
+  placeholder,
+}: {
+  label: string;
+  description?: string;
+  items: string[];
+  onAdd: (value: string) => void;
+  onRemove: (index: number) => void;
+  placeholder?: string;
+}) {
+  const [input, setInput] = useState("");
+
+  function handleAdd() {
+    const trimmed = input.trim();
+    if (!trimmed || items.includes(trimmed)) return;
+    onAdd(trimmed);
+    setInput("");
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item, i) => (
+          <Badge key={i} variant="outline" className="gap-1.5 ring-1 ring-inset ring-border/40 pr-1.5">
+            {item}
+            <button
+              type="button"
+              className="ml-0.5 rounded-full p-0.5 hover:bg-muted"
+              onClick={() => onRemove(i)}
+            >
+              <X className="size-3" />
+            </button>
+          </Badge>
+        ))}
+        {items.length === 0 ? <span className="text-sm text-muted-foreground">None added yet</span> : null}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          className="h-10 flex-1"
+          placeholder={placeholder}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
+        />
+        <Button variant="outline" className="h-10" disabled={!input.trim()} onClick={handleAdd}>
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CustomOptionsSettingsSection() {
+  const { options, loaded, saveOptions } = useCustomOptions();
+
+  if (!loaded) {
+    return (
+      <Card className="border border-border/40 bg-card/80 backdrop-blur">
+        <CardContent className="py-6">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" /> Loading options…
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const sections: { key: keyof CustomOptions; label: string; desc: string; placeholder: string }[] = [
+    { key: "topics", label: "Topic Focus", desc: "Niches and themes the research engine explores.", placeholder: "e.g. AI Side Projects" },
+    { key: "channels", label: "Target Channels", desc: "Platforms you publish to.", placeholder: "e.g. Threads" },
+    { key: "voices", label: "Brand Voice", desc: "Tone options when generating content.", placeholder: "e.g. Witty" },
+    { key: "audiences", label: "Target Audience", desc: "Who you're writing for.", placeholder: "e.g. CTOs" },
+  ];
+
+  return (
+    <Card className="border border-border/40 bg-card/80 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Search className="size-5" /> Research Options</CardTitle>
+        <CardDescription>Manage the topics, channels, voices, and audiences available in the Research tab.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {sections.map(({ key, label, desc, placeholder }) => (
+          <EditableTagList
+            key={key}
+            label={label}
+            description={desc}
+            items={options[key]}
+            placeholder={placeholder}
+            onAdd={(v) => saveOptions({ [key]: [...options[key], v] })}
+            onRemove={(i) => saveOptions({ [key]: options[key].filter((_, idx) => idx !== i) })}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImagePromptBlock({ prompt }: { prompt: string }) {
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="rounded-xl border border-border/40 bg-muted/20 overflow-hidden">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="flex items-center gap-2 font-medium text-foreground">
+          <ImageIcon className="size-4 text-muted-foreground" />
+          Image Prompt
+        </span>
+        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", expanded && "rotate-180")} />
+      </button>
+      {expanded ? (
+        <div className="border-t border-border/40 px-3 py-3 space-y-2">
+          <p className="text-sm leading-relaxed text-muted-foreground">{prompt}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={handleCopy}
+          >
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            {copied ? "Copied" : "Copy Prompt"}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ResearchView() {
+  const { addIdea } = useContentHub();
+  const { options, loaded } = useCustomOptions();
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+  const [selectedAudiences, setSelectedAudiences] = useState<string[]>([]);
+  const [additionalContext, setAdditionalContext] = useState("");
+  const [resultCount, setResultCount] = useState(3);
+  const [generating, setGenerating] = useState(false);
+  const [ideas, setIdeas] = useState<{ title: string; summary: string; signal: string; format: string; tags: string[]; imagePrompt?: string }[]>([]);
+  const [addedIndexes, setAddedIndexes] = useState<Set<number>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  function toggleAudience(item: string) {
+    setSelectedAudiences((prev) =>
+      prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item],
+    );
+  }
+
+  async function handleGenerate() {
+    if (!selectedTopic || !selectedChannel || !selectedVoice || selectedAudiences.length === 0) return;
+
+    setGenerating(true);
+    setError(null);
+    setIdeas([]);
+    setAddedIndexes(new Set());
+
+    try {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: selectedTopic,
+          channel: selectedChannel,
+          voice: selectedVoice,
+          audiences: selectedAudiences,
+          context: additionalContext.trim() || undefined,
+          count: resultCount,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || `Request failed (${res.status})`);
+        return;
+      }
+
+      if (data.ideas?.length) {
+        setIdeas(data.ideas);
+      } else if (data.raw) {
+        setError("Could not parse structured results. Try again.");
+      } else {
+        setError("No ideas returned. Try adjusting your parameters.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  if (!loaded) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <LoaderCircle className="size-4 animate-spin" /> Loading…
+        </div>
+      </div>
+    );
+  }
+
+  const readyToGenerate = selectedTopic && selectedChannel && selectedVoice && selectedAudiences.length > 0;
+
+  return (
+    <div className="space-y-6">
+      <Card className="border border-border/40 bg-card/80 backdrop-blur">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Sparkles className="size-5" />
+            AI Content Research
+          </CardTitle>
+          <CardDescription>
+            Pick your focus, channel, voice, and audience — then generate research-backed content ideas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="rounded-xl border border-border/40 bg-muted/30 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+            <p className="font-medium text-foreground">How it works</p>
+            <ul className="mt-1.5 space-y-1 list-none">
+              <li><span className="font-medium text-foreground">1. Social signals</span> — scans for real demand: complaints, debates, and trending pain points across social platforms</li>
+              <li><span className="font-medium text-foreground">2. Deep research</span> — cross-references with technical docs, competitor approaches, and what's actually shipping</li>
+              <li><span className="font-medium text-foreground">3. Synthesis</span> — combines signal + substance into builder-focused angles tailored to your voice and audience</li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Topic Focus</p>
+            <div className="flex flex-wrap gap-2">
+              {options.topics.map((topic) => (
+                <Button
+                  key={topic}
+                  variant={selectedTopic === topic ? "default" : "outline"}
+                  className="h-10"
+                  onClick={() => setSelectedTopic(selectedTopic === topic ? null : topic)}
+                >
+                  {topic}
+                </Button>
+              ))}
+              {options.topics.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No topics configured. Add them in Settings.</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Target Channel</p>
+            <div className="flex flex-wrap gap-2">
+              {options.channels.map((channel) => (
+                <Button
+                  key={channel}
+                  variant={selectedChannel === channel ? "default" : "outline"}
+                  className="h-10"
+                  onClick={() => setSelectedChannel(selectedChannel === channel ? null : channel)}
+                >
+                  {channel}
+                </Button>
+              ))}
+              {options.channels.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No channels configured. Add them in Settings.</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Brand Voice</p>
+            <div className="flex flex-wrap gap-2">
+              {options.voices.map((voice) => (
+                <Button
+                  key={voice}
+                  variant={selectedVoice === voice ? "default" : "outline"}
+                  className="h-10"
+                  onClick={() => setSelectedVoice(selectedVoice === voice ? null : voice)}
+                >
+                  {voice}
+                </Button>
+              ))}
+              {options.voices.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No voices configured. Add them in Settings.</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Target Audience</p>
+            <p className="text-xs text-muted-foreground">Select one or more.</p>
+            <div className="flex flex-wrap gap-2">
+              {options.audiences.map((audience) => (
+                <Button
+                  key={audience}
+                  variant={selectedAudiences.includes(audience) ? "default" : "outline"}
+                  className="h-10"
+                  onClick={() => toggleAudience(audience)}
+                >
+                  {audience}
+                </Button>
+              ))}
+              {options.audiences.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No audiences configured. Add them in Settings.</p>
+              ) : null}
+            </div>
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Number of Results</p>
+            <div className="flex flex-wrap gap-2">
+              {[1, 2, 3, 5, 10].map((n) => (
+                <Button
+                  key={n}
+                  variant={resultCount === n ? "default" : "outline"}
+                  className="h-10 min-w-12"
+                  onClick={() => setResultCount(n)}
+                >
+                  {n}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Additional Context <span className="font-normal text-muted-foreground">(optional)</span></p>
+            <Textarea
+              className="min-h-[5rem] resize-y text-base leading-7"
+              placeholder="E.g. a specific angle, a recent event to reference, a URL to riff on…"
+              value={additionalContext}
+              onChange={(e) => setAdditionalContext(e.target.value)}
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="border-t border-border/40 pt-5">
+          <Button
+            className="h-12 w-full text-base"
+            disabled={!readyToGenerate || generating}
+            onClick={handleGenerate}
+          >
+            {generating ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            {generating ? "Generating…" : "Generate Research"}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {error ? (
+        <Card className="border border-destructive/30 bg-destructive/5 backdrop-blur">
+          <CardContent className="py-5">
+            <p className="text-sm font-medium text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {ideas.length > 0 ? (
+        <div className="space-y-4">
+          {ideas.map((idea, index) => {
+            const added = addedIndexes.has(index);
+            return (
+              <Card key={index} className={cn("border border-border/40 bg-card/80 backdrop-blur transition", added && "opacity-60")}>
+                <CardContent className="pt-5 pb-4 space-y-3">
+                  <p className="text-lg font-semibold leading-7">{idea.title}</p>
+                  <p className="text-base leading-7 text-muted-foreground">{idea.summary}</p>
+                  <div className="rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">Signal:</span> {idea.signal}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="ring-1 ring-inset ring-border/40">{idea.format}</Badge>
+                    {idea.tags?.map((tag) => (
+                      <Badge key={tag} variant="outline" className="ring-1 ring-inset ring-border/40 text-muted-foreground">{tag}</Badge>
+                    ))}
+                  </div>
+                  {idea.imagePrompt ? (
+                    <ImagePromptBlock prompt={idea.imagePrompt} />
+                  ) : null}
+                </CardContent>
+                <CardFooter className="border-t border-border/40 pt-4">
+                  <Button
+                    className="h-10 w-full"
+                    variant={added ? "outline" : "default"}
+                    disabled={added}
+                    onClick={() => {
+                      addIdea({
+                        title: idea.title,
+                        description: `${idea.summary}\n\nSignal: ${idea.signal}\nFormat: ${idea.format}`,
+                        imagePrompt: idea.imagePrompt,
+                        platform: selectedChannel?.toLowerCase() === "substack" ? "substack" : selectedChannel?.toLowerCase() === "linkedin" ? "linkedin" : "both",
+                        postType: "trenches",
+                        priority: "medium",
+                        status: "new",
+                        tags: idea.tags ?? [],
+                      });
+                      setAddedIndexes((prev) => new Set(prev).add(index));
+                    }}
+                  >
+                    {added ? (
+                      <><Check className="size-4" /> Added to Ideas</>
+                    ) : (
+                      <><Plus className="size-4" /> Add to Ideas</>
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2102,17 +2760,20 @@ export function ContentHubDashboard() {
 
       <main
         className={cn(
-          "mx-auto flex-1 py-4 pb-32 sm:py-5",
+          "mx-auto flex-1 pt-4 pb-40 sm:pt-5 sm:pb-40",
           activeTab === "board" ? "max-w-[100rem] px-4 lg:px-8" : "max-w-3xl px-4",
         )}
       >
         {activeTab === "board" ? <BoardView /> : null}
         {activeTab === "calendar" ? <CalendarView /> : null}
+        <div className={activeTab === "research" ? "" : "hidden"}>
+          <ResearchView />
+        </div>
         {activeTab === "settings" ? <SettingsView /> : null}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/92 px-1 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-3">
+        <div className="mx-auto grid max-w-3xl grid-cols-4">
           {TAB_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = item.id === activeTab;

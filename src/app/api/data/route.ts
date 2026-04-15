@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { getApprovalStatusForPostStatus, resolveApprovalStatus } from "@/lib/post-approval";
 import { seedContentHubData } from "@/lib/seed-data";
 import type {
   AnalyticsEntry,
@@ -24,23 +25,6 @@ function getDefaultData(): ContentHubData {
 
 const IDEA_STATUSES: Idea["status"][] = ["new", "developing", "ready"];
 const POST_STATUSES: Post["status"][] = ["idea", "draft", "review", "approved", "posted"];
-
-function getApprovalStatusForPostStatus(
-  status: Post["status"],
-  currentApprovalStatus?: Post["approvalStatus"],
-): Post["approvalStatus"] {
-  if (status === "approved" || status === "posted") {
-    return "approved";
-  }
-
-  if (status === "review") {
-    return currentApprovalStatus === "needs-revision" || currentApprovalStatus === "rejected"
-      ? currentApprovalStatus
-      : "pending";
-  }
-
-  return "pending";
-}
 
 // ---------------------------------------------------------------------------
 // GET — read full state from Postgres
@@ -121,7 +105,10 @@ async function readPosts(): Promise<Post[]> {
       postType: r.post_type as Post["postType"],
       scheduledAt: (r.scheduled_at as Date).toISOString(),
       status: r.status as Post["status"],
-      approvalStatus: (r.approval_status as Post["approvalStatus"]) || undefined,
+      approvalStatus: resolveApprovalStatus(
+        r.status as Post["status"],
+        r.approval_status as Post["approvalStatus"] | null | undefined,
+      ),
       comments: commentsByPost.get(postId) || [],
       revisions: revisionsByPost.get(postId) || [],
       metrics: metricsByPost.get(postId),
@@ -265,7 +252,9 @@ export async function PUT(request: Request) {
         [
           post.id, post.ideaId || null, post.title, post.content,
           post.imageUrl || null, post.platform, post.postType,
-          post.scheduledAt, post.status, post.approvalStatus || "pending",
+          post.scheduledAt,
+          post.status,
+          resolveApprovalStatus(post.status, post.approvalStatus),
           post.createdAt, post.updatedAt,
         ],
       );
