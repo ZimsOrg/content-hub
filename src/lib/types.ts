@@ -76,6 +76,7 @@ export interface Post {
   comments: Comment[];
   revisions: Revision[];
   metrics?: PostMetrics;
+  imagePrompt?: string;
   archived?: boolean;
   createdAt: string;
   updatedAt: string;

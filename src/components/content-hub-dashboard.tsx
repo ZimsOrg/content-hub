@@ -889,6 +889,7 @@ function BoardCardDialog({
   onArchivePost,
   onDeleteIdea,
   onDeletePost,
+  onEditPost,
 }: {
   idea: Idea | null;
   post: Post | null;
@@ -900,6 +901,7 @@ function BoardCardDialog({
   onArchiveIdea: (ideaId: string, archived: boolean) => void;
   onArchivePost: (postId: string, archived: boolean) => void;
   onDeleteIdea: (ideaId: string) => void;
+  onEditPost: (postId: string) => void;
   onDeletePost: (postId: string) => void;
 }) {
   const { savePostContent, updateIdea, updatePost } = useContentHub();
@@ -993,6 +995,16 @@ function BoardCardDialog({
                 options={POST_STATUS_OPTIONS}
                 onChange={(status) => onMovePostStatus(activePost.id, status as Post["status"])}
               />
+
+              {activePost.status === "draft" && (
+                <Button
+                  className="h-11 w-full gap-2 text-base"
+                  onClick={() => { onEditPost(activePost.id); onOpenChange(false); }}
+                >
+                  <PencilLine className="size-4" />
+                  Open Draft Editor
+                </Button>
+              )}
 
               {(activePost.status === "approved" || activePost.status === "posted") && (
                 <div className="space-y-1.5">
@@ -1358,6 +1370,245 @@ function CalendarView() {
   );
 }
 
+function DraftEditorOverlay({
+  post,
+  onClose,
+}: {
+  post: Post | null;
+  onClose: () => void;
+}) {
+  const { savePostContent, updatePost } = useContentHub();
+  const [prompt, setPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (post) {
+      setEditingContent(post.content || "");
+      setImageUrl(post.imageUrl || "");
+      setGeneratedContent(null);
+      setError(null);
+      if (!prompt && post.title) {
+        setPrompt(`Write a ${post.platform === "substack" ? "long-form Substack article" : "LinkedIn post"} about: ${post.title}${post.content ? `\n\nContext: ${post.content}` : ""}`);
+      }
+    }
+  }, [post?.id]);
+
+  if (!post) return null;
+
+  const isLinkedIn = post.platform === "linkedin";
+  const isSubstack = post.platform === "substack";
+
+  async function handleGenerate() {
+    if (!prompt.trim() || !post) return;
+    setGenerating(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          platform: post.platform,
+          title: post.title,
+          description: post.content,
+          imagePrompt: post.imagePrompt,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Generation failed");
+        return;
+      }
+
+      setGeneratedContent(data.content);
+      setEditingContent(data.content);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function handleSave() {
+    if (!post) return;
+    savePostContent(post.id, editingContent);
+    if (imageUrl !== (post.imageUrl || "")) {
+      updatePost(post.id, { imageUrl: imageUrl || undefined });
+    }
+    onClose();
+  }
+
+  function handleUseGenerated() {
+    if (generatedContent) {
+      setEditingContent(generatedContent);
+    }
+  }
+
+  function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setImageUrl(url);
+  }
+
+  // LinkedIn preview: first 2 lines as hook
+  const hookLines = editingContent.split("\n").filter(Boolean).slice(0, 2).join("\n");
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-background">
+      <header className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3 sm:px-6">
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-semibold">{post.title}</h2>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-medium">{isLinkedIn ? "LinkedIn" : isSubstack ? "Substack" : post.platform}</span>
+            <span>·</span>
+            <span>Draft Editor</span>
+            {generating && <LoaderCircle className="size-3.5 animate-spin" />}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button className="h-10" onClick={handleSave}>
+            <Check className="size-4" />
+            Save & Close
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-10 rounded-full border-border/50"
+            onClick={onClose}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
+          {/* Prompt */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Prompt</label>
+            <Textarea
+              className="min-h-[5rem] resize-y text-base leading-7"
+              placeholder={isLinkedIn
+                ? "e.g. Write a scroll-stopping LinkedIn post about..."
+                : "e.g. Write a deep-dive Substack article about..."
+              }
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button
+                className="h-10"
+                disabled={!prompt.trim() || generating}
+                onClick={handleGenerate}
+              >
+                {generating ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {generating ? "Generating…" : "Generate"}
+              </Button>
+            </div>
+          </div>
+
+          {error ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive">
+              {error}
+            </div>
+          ) : null}
+
+          {/* LinkedIn hook preview */}
+          {isLinkedIn && editingContent.trim() ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Hook Preview <span className="font-normal text-muted-foreground">(what people see before &ldquo;...see more&rdquo;)</span></label>
+              <div className="rounded-xl border border-border/40 bg-muted/20 px-4 py-3">
+                <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">{hookLines}</pre>
+                <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">...see more</p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Generated output */}
+          {generatedContent && generatedContent !== editingContent ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Generated Output</label>
+                <Button size="sm" className="h-8" onClick={handleUseGenerated}>
+                  Use This
+                </Button>
+              </div>
+              <div className="rounded-xl border border-border/40 bg-muted/10 px-4 py-3">
+                <pre className="font-sans whitespace-pre-wrap break-words text-base leading-7 text-foreground">{generatedContent}</pre>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Content editor */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Content</label>
+            <Textarea
+              className={cn(
+                "w-full resize-y font-sans text-base leading-7",
+                isSubstack ? "min-h-[24rem]" : "min-h-[12rem]",
+              )}
+              value={editingContent}
+              onChange={(e) => setEditingContent(e.target.value)}
+              placeholder={isSubstack
+                ? "Write your long-form article here..."
+                : "Write your post here..."
+              }
+            />
+            {isLinkedIn && editingContent.length > 0 ? (
+              <p className={cn("text-xs", editingContent.length > 1300 ? "text-destructive" : "text-muted-foreground")}>
+                {editingContent.length} / 1,300 characters
+              </p>
+            ) : null}
+          </div>
+
+          {/* Image */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium">Image</label>
+            {imageUrl ? (
+              <div className="space-y-2">
+                <div className="overflow-hidden rounded-xl border border-border/40">
+                  <img src={imageUrl} alt="Post image" className="h-auto max-h-64 w-full object-cover" />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-9" onClick={() => fileInputRef.current?.click()}>
+                    Replace
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-9 text-destructive hover:bg-destructive/10" onClick={() => setImageUrl("")}>
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" className="h-11 w-full gap-2 border-dashed border-border/50" onClick={() => fileInputRef.current?.click()}>
+                <ImageIcon className="size-4" />
+                Upload Image
+              </Button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+            {post.imagePrompt ? (
+              <ImagePromptBlock prompt={post.imagePrompt} />
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NewCardDialog({
   open,
   onOpenChange,
@@ -1517,7 +1768,7 @@ function NewCardDialog({
   );
 }
 
-function BoardView() {
+function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
   const { data, setIdeaStatus, setPostStatus, scheduleIdea, deleteIdea, deletePost, archiveIdea, archivePost, unarchiveIdea, unarchivePost } = useContentHub();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<"idea" | "post" | null>(null);
@@ -1811,6 +2062,17 @@ function BoardView() {
                           />
                           <div className="flex items-center gap-1.5">
                             {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
+                            {post.status === "draft" && (
+                              <Button
+                                variant="ghost"
+                                size="icon-lg"
+                                className="size-9 text-muted-foreground hover:text-foreground"
+                                onClick={(e: MouseEvent) => { e.stopPropagation(); onEditPost(post.id); }}
+                                title="Edit Draft"
+                              >
+                                <PencilLine className="size-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon-lg"
@@ -1872,6 +2134,7 @@ function BoardView() {
         onArchivePost={(postId, archived) => { archived ? archivePost(postId) : unarchivePost(postId); }}
         onDeleteIdea={(id) => { const i = data.ideas.find((x) => x.id === id); confirmDelete(id, "idea", i?.title ?? ""); }}
         onDeletePost={(id) => { const p = data.posts.find((x) => x.id === id); confirmDelete(id, "post", p?.title ?? ""); }}
+        onEditPost={onEditPost}
       />
 
       <ScheduleIdeaDialog
@@ -2657,6 +2920,8 @@ export function ContentHubDashboard() {
   const searchParams = useSearchParams();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeTab, setActiveTabState] = useState<TabId>(() => parseTab(searchParams.get("tab")));
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const editingPost = editingPostId ? data.posts.find((p) => p.id === editingPostId) ?? null : null;
 
   function setActiveTab(nextTab: TabId) {
     setActiveTabState(nextTab);
@@ -2753,7 +3018,7 @@ export function ContentHubDashboard() {
           activeTab === "board" ? "max-w-[100rem] px-4 lg:px-8" : "max-w-3xl px-4",
         )}
       >
-        {activeTab === "board" ? <BoardView /> : null}
+        {activeTab === "board" ? <BoardView onEditPost={setEditingPostId} /> : null}
         {activeTab === "calendar" ? <CalendarView /> : null}
         <div className={activeTab === "research" ? "" : "hidden"}>
           <ResearchView />
@@ -2788,6 +3053,13 @@ export function ContentHubDashboard() {
         </div>
       </nav>
     </div>
+
+    {editingPost ? (
+      <DraftEditorOverlay
+        post={editingPost}
+        onClose={() => setEditingPostId(null)}
+      />
+    ) : null}
     </ImageViewerProvider>
   );
 }
