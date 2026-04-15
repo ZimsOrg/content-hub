@@ -55,10 +55,14 @@ type ContentHubContextValue = {
   updateIdea: (ideaId: string, patch: Partial<Idea>) => void;
   setIdeaStatus: (ideaId: string, status: Idea["status"]) => Promise<void>;
   deleteIdea: (ideaId: string) => void;
+  archiveIdea: (ideaId: string) => void;
+  unarchiveIdea: (ideaId: string) => void;
   deletePost: (postId: string) => void;
   addPost: (input: NewPostInput) => void;
   updatePost: (postId: string, patch: Partial<Post>) => void;
   setPostStatus: (postId: string, status: PostStatus) => Promise<void>;
+  archivePost: (postId: string) => void;
+  unarchivePost: (postId: string) => void;
   scheduleIdea: (input: ScheduleIdeaInput) => void;
   addComment: (postId: string, text: string, author?: Comment["author"]) => void;
   setApprovalStatus: (
@@ -296,6 +300,38 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
         setData((current) => ({
           ...current,
           posts: current.posts.filter((post) => post.id !== postId),
+        }));
+      },
+      archiveIdea: (ideaId) => {
+        setData((current) => ({
+          ...current,
+          ideas: current.ideas.map((idea) =>
+            idea.id === ideaId ? { ...idea, archived: true, updatedAt: new Date().toISOString() } : idea,
+          ),
+        }));
+      },
+      unarchiveIdea: (ideaId) => {
+        setData((current) => ({
+          ...current,
+          ideas: current.ideas.map((idea) =>
+            idea.id === ideaId ? { ...idea, archived: false, updatedAt: new Date().toISOString() } : idea,
+          ),
+        }));
+      },
+      archivePost: (postId) => {
+        setData((current) => ({
+          ...current,
+          posts: current.posts.map((post) =>
+            post.id === postId ? { ...post, archived: true, updatedAt: new Date().toISOString() } : post,
+          ),
+        }));
+      },
+      unarchivePost: (postId) => {
+        setData((current) => ({
+          ...current,
+          posts: current.posts.map((post) =>
+            post.id === postId ? { ...post, archived: false, updatedAt: new Date().toISOString() } : post,
+          ),
         }));
       },
       addPost: (input) => {

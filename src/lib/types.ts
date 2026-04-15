@@ -35,6 +35,7 @@ export interface Idea {
   status: IdeaStatus;
   tags?: string[];
   imagePrompt?: string;
+  archived?: boolean;
   createdAt: string;
   updatedAt: string;
   scheduledPostIds?: string[];
@@ -75,6 +76,7 @@ export interface Post {
   comments: Comment[];
   revisions: Revision[];
   metrics?: PostMetrics;
+  archived?: boolean;
   createdAt: string;
   updatedAt: string;
 }

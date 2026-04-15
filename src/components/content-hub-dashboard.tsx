@@ -82,6 +82,7 @@ import type {
   Platform,
   Post,
   PostPlatform,
+  PostStatus,
   PostType,
   ResearchConfig,
   TabId,
