@@ -41,6 +41,8 @@ async function readIdeas(): Promise<Idea[]> {
     priority: r.priority as Idea["priority"],
     status: r.status as Idea["status"],
     tags: (r.tags as string[]) || [],
+    imagePrompt: (r.image_prompt as string) || undefined,
+    archived: (r.archived as boolean) ?? false,
     createdAt: (r.created_at as Date).toISOString(),
     updatedAt: (r.updated_at as Date).toISOString(),
     scheduledPostIds: [],
@@ -112,6 +114,8 @@ async function readPosts(): Promise<Post[]> {
       comments: commentsByPost.get(postId) || [],
       revisions: revisionsByPost.get(postId) || [],
       metrics: metricsByPost.get(postId),
+      imagePrompt: (r.image_prompt as string) || undefined,
+      archived: (r.archived as boolean) ?? false,
       createdAt: (r.created_at as Date).toISOString(),
       updatedAt: (r.updated_at as Date).toISOString(),
     };
@@ -201,8 +205,8 @@ export async function PUT(request: Request) {
     // Upsert ideas
     for (const idea of payload.ideas) {
       await sql.query(
-        `INSERT INTO ideas (id, title, description, platform, post_type, priority, status, tags, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO ideas (id, title, description, platform, post_type, priority, status, tags, image_prompt, archived, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (id) DO UPDATE SET
            title = EXCLUDED.title,
            description = EXCLUDED.description,
@@ -211,11 +215,14 @@ export async function PUT(request: Request) {
            priority = EXCLUDED.priority,
            status = EXCLUDED.status,
            tags = EXCLUDED.tags,
+           image_prompt = EXCLUDED.image_prompt,
+           archived = EXCLUDED.archived,
            updated_at = EXCLUDED.updated_at`,
         [
           idea.id, idea.title, idea.description || null,
           idea.platform, idea.postType, idea.priority, idea.status,
-          idea.tags || [], idea.createdAt, idea.updatedAt,
+          idea.tags || [], idea.imagePrompt || null, idea.archived ?? false,
+          idea.createdAt, idea.updatedAt,
         ],
       );
     }
@@ -236,8 +243,8 @@ export async function PUT(request: Request) {
     // Upsert posts + nested data
     for (const post of payload.posts) {
       await sql.query(
-        `INSERT INTO posts (id, idea_id, title, content, image_url, platform, post_type, scheduled_at, status, approval_status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `INSERT INTO posts (id, idea_id, title, content, image_url, platform, post_type, scheduled_at, status, approval_status, image_prompt, archived, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          ON CONFLICT (id) DO UPDATE SET
            idea_id = EXCLUDED.idea_id,
            title = EXCLUDED.title,
@@ -248,6 +255,8 @@ export async function PUT(request: Request) {
            scheduled_at = EXCLUDED.scheduled_at,
            status = EXCLUDED.status,
            approval_status = EXCLUDED.approval_status,
+           image_prompt = EXCLUDED.image_prompt,
+           archived = EXCLUDED.archived,
            updated_at = EXCLUDED.updated_at`,
         [
           post.id, post.ideaId || null, post.title, post.content,
@@ -255,6 +264,7 @@ export async function PUT(request: Request) {
           post.scheduledAt,
           post.status,
           resolveApprovalStatus(post.status, post.approvalStatus),
+          post.imagePrompt || null, post.archived ?? false,
           post.createdAt, post.updatedAt,
         ],
       );

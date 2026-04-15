@@ -8,7 +8,7 @@ const DEFAULT_CONFIG: ResearchConfig = {
   topicSeeds: [],
   defaultModel: "anthropic/claude-sonnet-4",
   searchModel: "perplexity/sonar-pro",
-  imageModel: "openai/dall-e-3",
+  imageModel: "google/gemini-2.5-flash-preview-05-20",
 };
 
 export async function GET() {

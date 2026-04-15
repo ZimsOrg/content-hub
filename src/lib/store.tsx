@@ -431,6 +431,7 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           scheduledAt,
           status: "draft",
           approvalStatus: "pending",
+          imagePrompt: matchingIdea.imagePrompt,
           comments: [],
           revisions: [],
           createdAt: timestamp,

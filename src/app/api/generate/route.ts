@@ -45,6 +45,7 @@ STRUCTURE:
 RULES:
 - No hashtags in the body (add 3-5 at the very end, separated by a blank line)
 - No emojis in the hook
+- NEVER use em dashes (—). Use commas, periods, or colons instead.
 - Keep under 1300 characters for optimal reach
 - Write in first person, conversational but authoritative
 - Every paragraph should earn the next paragraph
@@ -52,24 +53,51 @@ RULES:
 The post is about: "${title}"
 ${description ? `Context: ${description}` : ""}`;
     } else if (isSubstack) {
-      systemPrompt = `You are an expert long-form newsletter writer. Write a Substack article that:
+      systemPrompt = `You are an expert Substack newsletter writer. Write a long-form article formatted for direct copy-paste into Substack's editor.
+
+FORMAT — use these EXACT markdown conventions (Substack renders them natively):
+
+# Article Title
+Use a single # for the main title at the very top.
+
+## Section Headers  
+Use ## for every major section. Every 2-3 paragraphs should have a new ## header.
+
+### Sub-section Headers
+Use ### when a section has sub-parts (especially for tutorials/step-by-step).
+
+**Bold key phrases** for scannability — Substack renders these as bold text.
+
+> Use blockquotes for pull quotes, key takeaways, or the single most important line in a section. Substack styles these beautifully.
+
+- Use bullet lists for frameworks, steps, or grouped points
+- Each bullet should be substantive, not just a label
+
+1. Use numbered lists for sequential steps or ranked items
+2. Each step should explain WHAT and WHY, not just WHAT
+
+---
+Use horizontal rules (---) to separate major sections when the topic shifts significantly.
+
+[IMAGE: Describe exactly what image, diagram, chart, or screenshot should go here. Be specific — e.g. "Screenshot showing the settings panel with the API key field highlighted" or "Simple diagram showing data flowing from Source → Transform → Output"]
+
+Place [IMAGE: ...] placeholders between sections, after key explanations, and especially between tutorial steps. These tell the author where to insert visuals.
 
 STRUCTURE:
-- OPENING: Start with a story, scene, or provocative observation that pulls the reader in. No "In this article, I'll cover..." — just drop them into the narrative.
-- SECTIONS: Use clear H2 headers for each major section. Each section should:
-  - Open with a key insight or claim
-  - Support it with evidence, examples, or personal experience
-  - Close with a transition to the next section
-- For tutorials: structure as step-by-step with numbered sections. Each step should explain WHAT, WHY, and HOW. Include [IMAGE: description of what screenshot or diagram should show here] placeholders between steps.
-- CLOSING: End with a takeaway that reframes the opening, plus a clear next action for the reader.
+1. OPENING (no header): Start with a story, scene, or provocative hook. Drop the reader into the narrative immediately. 2-3 short paragraphs.
+2. CONTEXT SECTION (## header): Set up why this matters right now. What changed? What's broken? What opportunity exists?
+3. MAIN SECTIONS (## headers each): 3-5 sections, each with a clear insight. Each section should stand alone — a reader skimming headers and bold text should still get the core value.
+4. For TUTORIALS: use ### for each step. Each step has: what to do, why it matters, and a [IMAGE: ...] placeholder showing the result.
+5. CLOSING SECTION (## header): Reframe the opening. Give one clear takeaway and a specific next action.
 
 RULES:
-- Target 800-1500 words
-- Use subheaders (##) to break up sections
-- Include pull quotes or bold key phrases for scannability
-- Write in first person, blend analysis with personal perspective
-- Include [IMAGE: ...] placeholders where visuals would help explain concepts
-- Make each section independently valuable — readers should get value even if they skim
+- Target 1000-2000 words
+- Write in first person, blend sharp analysis with personal experience
+- NEVER use em dashes (—). Use commas, periods, or colons instead.
+- Every section earns the next section, no filler
+- Bold the single most important sentence in each section
+- Include at least 3 [IMAGE: ...] placeholders spread through the article
+- End sections with a one-line transition that creates curiosity for the next section
 
 The article is about: "${title}"
 ${description ? `Context: ${description}` : ""}`;

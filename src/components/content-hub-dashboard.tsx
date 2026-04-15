@@ -72,6 +72,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/DatePicker";
 import { cn } from "@/lib/utils";
 import { useContentHub } from "@/lib/store";
 import type {
@@ -687,14 +688,9 @@ function ScheduleIdeaDialog({
                 <label className="text-sm font-medium text-muted-foreground">
                   Date
                 </label>
-                <Input
-                  className="h-12 text-base"
-                  type="date"
-                  value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
-                  onChange={(event) => {
-                    const d = event.target.value ? parseISO(event.target.value) : undefined;
-                    setSelectedDate(d);
-                  }}
+                <DatePicker
+                  value={selectedDate}
+                  onChange={setSelectedDate}
                 />
               </div>
               <div className="space-y-2">
@@ -947,10 +943,6 @@ function BoardCardDialog({
                 </div>
               ) : null}
 
-              <Button className="h-12 w-full text-base" onClick={() => onScheduleIdea(activeIdea)}>
-                <Plus />
-                Add to Calendar
-              </Button>
 
               <div className="flex gap-2">
                 <Button
@@ -1009,13 +1001,11 @@ function BoardCardDialog({
               {(activePost.status === "approved" || activePost.status === "posted") && (
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Posting Date</label>
-                  <Input
-                    type="date"
-                    className="h-11"
-                    value={activePost.scheduledAt.substring(0, 10)}
-                    onChange={(e) => {
-                      const d = new Date(e.target.value + "T09:00:00");
-                      if (!isNaN(d.getTime())) {
+                  <DatePicker
+                    value={parseISO(activePost.scheduledAt)}
+                    onChange={(d) => {
+                      if (d) {
+                        d.setHours(9, 0, 0, 0);
                         updatePost(activePost.id, { scheduledAt: d.toISOString() });
                       }
                     }}
@@ -1370,6 +1360,26 @@ function CalendarView() {
   );
 }
 
+function simpleMarkdownToHtml(md: string): string {
+  return md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    .replace(/^&gt; (.+)$/gm, "<blockquote><p>$1</p></blockquote>")
+    .replace(/^---$/gm, "<hr />")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[IMAGE: (.+?)\]/g, '<div class="rounded-lg border-2 border-dashed border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground my-4">📷 <strong>Image:</strong> $1</div>')
+    .replace(/^(\d+)\. (.+)$/gm, "<li>$1. $2</li>")
+    .replace(/^- (.+)$/gm, "<li>• $1</li>")
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n/g, "<br />")
+    .replace(/^/, "<p>")
+    .replace(/$/, "</p>");
+}
+
 function DraftEditorOverlay({
   post,
   onClose,
@@ -1383,6 +1393,8 @@ function DraftEditorOverlay({
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imagePromptText, setImagePromptText] = useState("");
+  const [generatingImage, setGeneratingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1390,6 +1402,7 @@ function DraftEditorOverlay({
     if (post) {
       setEditingContent(post.content || "");
       setImageUrl(post.imageUrl || "");
+      setImagePromptText(post.imagePrompt || "");
       setGeneratedContent(null);
       setError(null);
       if (!prompt && post.title) {
@@ -1439,9 +1452,10 @@ function DraftEditorOverlay({
   function handleSave() {
     if (!post) return;
     savePostContent(post.id, editingContent);
-    if (imageUrl !== (post.imageUrl || "")) {
-      updatePost(post.id, { imageUrl: imageUrl || undefined });
-    }
+    const patch: Partial<Post> = {};
+    if (imageUrl !== (post.imageUrl || "")) patch.imageUrl = imageUrl || undefined;
+    if (imagePromptText !== (post.imagePrompt || "")) patch.imagePrompt = imagePromptText || undefined;
+    if (Object.keys(patch).length > 0) updatePost(post.id, patch);
     onClose();
   }
 
@@ -1458,8 +1472,30 @@ function DraftEditorOverlay({
     setImageUrl(url);
   }
 
+  async function handleGenerateImage(imgPrompt: string) {
+    setGeneratingImage(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: imgPrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Image generation failed");
+        return;
+      }
+      setImageUrl(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
+
   // LinkedIn preview: first 2 lines as hook
-  const hookLines = editingContent.split("\n").filter(Boolean).slice(0, 2).join("\n");
+  const hookLines = editingContent.substring(0, 210).split("\n").slice(0, 2).join("\n");
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-background">
@@ -1526,7 +1562,7 @@ function DraftEditorOverlay({
             <div className="space-y-2">
               <label className="text-sm font-medium">Hook Preview <span className="font-normal text-muted-foreground">(what people see before &ldquo;...see more&rdquo;)</span></label>
               <div className="rounded-xl border border-border/40 bg-muted/20 px-4 py-3">
-                <pre className="font-sans whitespace-pre-wrap text-base leading-7 text-foreground">{hookLines}</pre>
+                <p className="font-sans text-base leading-7 text-foreground" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden" }}>{hookLines}</p>
                 <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">...see more</p>
               </div>
             </div>
@@ -1537,13 +1573,16 @@ function DraftEditorOverlay({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Generated Output</label>
-                <Button size="sm" className="h-8" onClick={handleUseGenerated}>
-                  Use This
-                </Button>
+                <div className="flex gap-2">
+                  <CopyPostButton content={generatedContent} label="Copy" className="h-8" />
+                  <Button size="sm" className="h-8" onClick={handleUseGenerated}>
+                    Use This
+                  </Button>
+                </div>
               </div>
-              <div className="rounded-xl border border-border/40 bg-muted/10 px-4 py-3">
-                <pre className="font-sans whitespace-pre-wrap break-words text-base leading-7 text-foreground">{generatedContent}</pre>
-              </div>
+              <div className="rounded-xl border border-border/40 bg-muted/10 px-5 py-4 prose prose-sm dark:prose-invert max-w-none [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-0 [&_h1]:mb-4 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:leading-7 [&_p]:mb-4 [&_blockquote]:border-l-4 [&_blockquote]:border-foreground/20 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_hr]:my-8 [&_ul]:space-y-1 [&_ol]:space-y-1 [&_strong]:text-foreground"
+                dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(generatedContent) }}
+              />
             </div>
           ) : null}
 
@@ -1581,16 +1620,36 @@ function DraftEditorOverlay({
                   <Button variant="outline" size="sm" className="h-9" onClick={() => fileInputRef.current?.click()}>
                     Replace
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5"
+                    disabled={generatingImage || !imagePromptText.trim()}
+                    onClick={() => handleGenerateImage(imagePromptText)}
+                  >
+                    {generatingImage ? <LoaderCircle className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                    Regenerate
+                  </Button>
                   <Button variant="outline" size="sm" className="h-9 text-destructive hover:bg-destructive/10" onClick={() => setImageUrl("")}>
                     Remove
                   </Button>
                 </div>
               </div>
             ) : (
-              <Button variant="outline" className="h-11 w-full gap-2 border-dashed border-border/50" onClick={() => fileInputRef.current?.click()}>
-                <ImageIcon className="size-4" />
-                Upload Image
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" className="h-11 flex-1 gap-2 border-dashed border-border/50" onClick={() => fileInputRef.current?.click()}>
+                  <ImageIcon className="size-4" />
+                  Upload
+                </Button>
+                <Button
+                  className="h-11 flex-1 gap-2"
+                  disabled={generatingImage || !imagePromptText.trim()}
+                  onClick={() => handleGenerateImage(imagePromptText)}
+                >
+                  {generatingImage ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                  {generatingImage ? "Generating…" : "Generate"}
+                </Button>
+              </div>
             )}
             <input
               ref={fileInputRef}
@@ -1599,9 +1658,15 @@ function DraftEditorOverlay({
               className="hidden"
               onChange={handleImageUpload}
             />
-            {post.imagePrompt ? (
-              <ImagePromptBlock prompt={post.imagePrompt} />
-            ) : null}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Image Prompt</label>
+              <Textarea
+                className="min-h-[4rem] resize-y text-sm leading-6"
+                placeholder="Describe the image you want: style, subject, composition, mood…"
+                value={imagePromptText}
+                onChange={(e) => setImagePromptText(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1742,13 +1807,13 @@ function NewCardDialog({
           {(status === "approved" || status === "posted") ? (
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Posting Date</label>
-              <Input
-                type="date"
-                className="h-11"
-                value={scheduledAt.substring(0, 10)}
-                onChange={(e) => {
-                  const d = new Date(e.target.value + "T09:00:00");
-                  if (!isNaN(d.getTime())) setScheduledAt(d.toISOString());
+              <DatePicker
+                value={new Date(scheduledAt)}
+                onChange={(d) => {
+                  if (d) {
+                    d.setHours(9, 0, 0, 0);
+                    setScheduledAt(d.toISOString());
+                  }
                 }}
               />
             </div>
@@ -1769,7 +1834,7 @@ function NewCardDialog({
 }
 
 function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
-  const { data, setIdeaStatus, setPostStatus, scheduleIdea, deleteIdea, deletePost, archiveIdea, archivePost, unarchiveIdea, unarchivePost } = useContentHub();
+  const { data, setIdeaStatus, setPostStatus, updateIdea, scheduleIdea, deleteIdea, deletePost, archiveIdea, archivePost, unarchiveIdea, unarchivePost } = useContentHub();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<"idea" | "post" | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
@@ -1789,7 +1854,13 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
     setPendingDelete(null);
   }
   const ideas = sortByNewest(
-    data.ideas.filter((idea) => showArchived || !idea.archived),
+    data.ideas.filter((idea) =>
+      (showArchived || !idea.archived) &&
+      (!idea.scheduledPostIds || idea.scheduledPostIds.length === 0),
+    ),
+  );
+  const ideaPosts = sortByNewest(
+    data.posts.filter((post) => post.status === "idea" && (showArchived || !post.archived)),
   );
   const archivedCount =
     data.ideas.filter((i) => i.archived).length +
@@ -1814,6 +1885,12 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
     setSavingStatusKey(key);
     try {
       await setPostStatus(postId, status);
+      if (status === "idea") {
+        const post = data.posts.find((p) => p.id === postId);
+        if (post?.ideaId) {
+          updateIdea(post.ideaId, { scheduledPostIds: [] });
+        }
+      }
     } finally {
       setSavingStatusKey((current) => (current === key ? null : current));
     }
@@ -1835,6 +1912,7 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
       cardBorder: "bg-gray-50 dark:bg-gray-900/30",
       empty: "No ideas in motion",
       ideas,
+      posts: ideaPosts,
     },
     {
       id: "draft",
@@ -1896,7 +1974,7 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
         </Button>
       </div>
 
-      {columns.every((column) => (column.ideas?.length ?? column.posts?.length ?? 0) === 0) ? (
+      {columns.every((column) => ((column.ideas?.length ?? 0) + (column.posts?.length ?? 0)) === 0) ? (
         <EmptyState
           icon={LayoutGrid}
           title="Board is empty"
@@ -1917,7 +1995,7 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
               >
                 <h3 className="truncate text-base font-bold tracking-tight">{column.title}</h3>
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-xs font-semibold">
-                  {(column.ideas?.length ?? column.posts?.length) || 0}
+                  {(column.ideas?.length ?? 0) + (column.posts?.length ?? 0)}
                 </span>
               </div>
 
@@ -1952,7 +2030,7 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
                             <ImagePromptBlock prompt={idea.imagePrompt} />
                           </div>
                         ) : null}
-                        <div className="mt-4 flex items-center justify-between gap-3">
+                        <div className="mt-4 space-y-2">
                           <CardStatusSelect
                             value="idea"
                             options={POST_STATUS_OPTIONS}
@@ -1978,24 +2056,26 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
                               }
                             }}
                           />
-                          <Button
-                            variant="ghost"
-                            size="icon-lg"
-                            className="size-9 text-muted-foreground hover:text-foreground"
-                            onClick={(e: MouseEvent) => { e.stopPropagation(); isArchived ? unarchiveIdea(idea.id) : archiveIdea(idea.id); }}
-                            title={isArchived ? "Unarchive" : "Archive"}
-                          >
-                            {isArchived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-lg"
-                            className="size-9 text-muted-foreground hover:text-destructive"
-                            onClick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(idea.id, "idea", idea.title); }}
-                            title="Delete"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-lg"
+                              className="size-8 text-muted-foreground hover:text-foreground"
+                              onClick={(e: MouseEvent) => { e.stopPropagation(); isArchived ? unarchiveIdea(idea.id) : archiveIdea(idea.id); }}
+                              title={isArchived ? "Unarchive" : "Archive"}
+                            >
+                              {isArchived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-lg"
+                              className="size-8 text-muted-foreground hover:text-destructive"
+                              onClick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(idea.id, "idea", idea.title); }}
+                              title="Delete"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </Surface>
@@ -2051,45 +2131,47 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
                           </div>
                         ) : null}
 
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <CardStatusSelect
-                            value={post.status}
-                            options={POST_STATUS_OPTIONS}
-                            disabled={isSaving}
-                            onChange={(status) => {
-                              void handlePostStatusChange(post.id, status as Post["status"]);
-                            }}
-                          />
-                          <div className="flex items-center gap-1.5">
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <CardStatusSelect
+                              value={post.status}
+                              options={POST_STATUS_OPTIONS}
+                              disabled={isSaving}
+                              onChange={(status) => {
+                                void handlePostStatusChange(post.id, status as Post["status"]);
+                              }}
+                            />
                             {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
+                          </div>
+                          <div className="flex justify-end gap-1">
                             {post.status === "draft" && (
                               <Button
                                 variant="ghost"
                                 size="icon-lg"
-                                className="size-9 text-muted-foreground hover:text-foreground"
+                                className="size-8 text-muted-foreground hover:text-foreground"
                                 onClick={(e: MouseEvent) => { e.stopPropagation(); onEditPost(post.id); }}
                                 title="Edit Draft"
                               >
-                                <PencilLine className="size-4" />
+                                <PencilLine className="size-3.5" />
                               </Button>
                             )}
                             <Button
                               variant="ghost"
                               size="icon-lg"
-                              className="size-9 text-muted-foreground hover:text-foreground"
+                              className="size-8 text-muted-foreground hover:text-foreground"
                               onClick={(e: MouseEvent) => { e.stopPropagation(); isArchived ? unarchivePost(post.id) : archivePost(post.id); }}
                               title={isArchived ? "Unarchive" : "Archive"}
                             >
-                              {isArchived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                              {isArchived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon-lg"
-                              className="size-9 text-muted-foreground hover:text-destructive"
+                              className="size-8 text-muted-foreground hover:text-destructive"
                               onClick={(e: MouseEvent) => { e.stopPropagation(); confirmDelete(post.id, "post", post.title); }}
                               title="Delete"
                             >
-                              <Trash2 className="size-4" />
+                              <Trash2 className="size-3.5" />
                             </Button>
                           </div>
                         </div>
@@ -2098,7 +2180,7 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
                   );
                 })}
 
-                {(column.ideas?.length ?? column.posts?.length ?? 0) === 0 ? (
+                {((column.ideas?.length ?? 0) + (column.posts?.length ?? 0)) === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border/50 px-4 py-8 text-center text-base text-muted-foreground">
                     {column.empty}
                   </div>
@@ -2446,7 +2528,7 @@ function ModelsSection() {
           {([
             ["defaultModel", "Default / Writing", "anthropic/claude-sonnet-4"],
             ["searchModel", "Search / Research", "perplexity/sonar-pro"],
-            ["imageModel", "Image Generation", "openai/dall-e-3"],
+            ["imageModel", "Image Generation", "google/gemini-2.5-flash-preview-05-20"],
           ] as const).map(([field, label, placeholder]) => (
             <div key={field} className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">{label}</label>
@@ -2651,6 +2733,56 @@ function ResearchView() {
   const [ideas, setIdeas] = useState<{ title: string; summary: string; signal: string; format: string; tags: string[]; imagePrompt?: string }[]>([]);
   const [addedIndexes, setAddedIndexes] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [defaultPrompt, setDefaultPrompt] = useState("");
+  const [isCustomPrompt, setIsCustomPrompt] = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const promptLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (promptLoadedRef.current) return;
+    promptLoadedRef.current = true;
+    fetch("/api/settings/research-prompt")
+      .then((r) => r.json())
+      .then((d) => {
+        setSystemPrompt(d.prompt);
+        setDefaultPrompt(d.defaultPrompt);
+        setIsCustomPrompt(d.isCustom);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function savePrompt() {
+    setSavingPrompt(true);
+    try {
+      const res = await fetch("/api/settings/research-prompt", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: systemPrompt }),
+      });
+      const d = await res.json();
+      if (d.prompt) {
+        setSystemPrompt(d.prompt);
+        setIsCustomPrompt(d.isCustom);
+      }
+    } finally {
+      setSavingPrompt(false);
+    }
+  }
+
+  function resetPrompt() {
+    setSystemPrompt(defaultPrompt);
+    setSavingPrompt(true);
+    fetch("/api/settings/research-prompt", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: null }),
+    })
+      .then((r) => r.json())
+      .then((d) => { setSystemPrompt(d.prompt); setIsCustomPrompt(false); })
+      .finally(() => setSavingPrompt(false));
+  }
 
   function toggleAudience(item: string) {
     setSelectedAudiences((prev) =>
@@ -2910,6 +3042,54 @@ function ResearchView() {
           })}
         </div>
       ) : null}
+
+      <div className="rounded-xl border border-border/40 bg-card/80 backdrop-blur overflow-hidden">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm"
+          onClick={() => setPromptExpanded(!promptExpanded)}
+        >
+          <span className="flex items-center gap-2 font-medium">
+            System Prompt
+            {isCustomPrompt && (
+              <Badge variant="outline" className="text-xs ring-1 ring-inset ring-border/40">Custom</Badge>
+            )}
+          </span>
+          <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", promptExpanded && "rotate-180")} />
+        </button>
+        {promptExpanded && (
+          <div className="border-t border-border/40 px-4 py-4 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              This prompt controls how research ideas are generated. Use placeholders: {"{{topic}}"}, {"{{channel}}"}, {"{{voice}}"}, {"{{audience}}"}, {"{{context}}"}, {"{{count}}"}.
+            </p>
+            <Textarea
+              className="min-h-[16rem] resize-y font-mono text-sm leading-6"
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="h-9"
+                disabled={savingPrompt}
+                onClick={savePrompt}
+              >
+                {savingPrompt ? <LoaderCircle className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9"
+                disabled={savingPrompt || !isCustomPrompt}
+                onClick={resetPrompt}
+              >
+                Reset to Default
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
