@@ -77,6 +77,7 @@ export interface Post {
   revisions: Revision[];
   metrics?: PostMetrics;
   imagePrompt?: string;
+  sectionImages?: string[];
   archived?: boolean;
   createdAt: string;
   updatedAt: string;

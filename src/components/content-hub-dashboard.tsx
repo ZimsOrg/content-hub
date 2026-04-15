@@ -1040,7 +1040,7 @@ function BoardCardDialog({
                   <TappableImage
                     src={activePost.imageUrl}
                     alt={`Image for ${activePost.title}`}
-                    className="h-auto max-h-[28rem] w-full object-cover"
+                    className="h-auto w-full object-contain max-h-[28rem]"
                   />
                 </div>
               ) : null}
@@ -1380,6 +1380,201 @@ function simpleMarkdownToHtml(md: string): string {
     .replace(/$/, "</p>");
 }
 
+function compressImageFile(file: File, maxWidth = 800, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, maxWidth / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function parseSectionPrompts(text: string): { label: string; prompt: string }[] {
+  const sections: { label: string; prompt: string }[] = [];
+  const heroMatch = text.match(/^Hero:\s*([\s\S]+?)(?=\n\nSection \d|$)/);
+  if (heroMatch) sections.push({ label: "Hero", prompt: heroMatch[1].trim() });
+
+  const sectionRegex = /Section (\d+):\s*([\s\S]+?)(?=\n\nSection \d|$)/g;
+  let match;
+  while ((match = sectionRegex.exec(text)) !== null) {
+    sections.push({ label: `Section ${match[1]}`, prompt: match[2].trim() });
+  }
+
+  if (sections.length === 0 && text.trim()) {
+    sections.push({ label: "Image", prompt: text.trim() });
+  }
+
+  return sections;
+}
+
+function DraftImageSection({
+  imageUrl,
+  imagePromptText,
+  generatingImage,
+  sectionImages,
+  onSetSectionImages,
+  onSetImageUrl,
+  onSetImagePromptText,
+  onGenerateImage,
+  onUploadClick,
+}: {
+  imageUrl: string;
+  imagePromptText: string;
+  generatingImage: boolean;
+  sectionImages: Record<number, string>;
+  onSetSectionImages: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
+  onSetImageUrl: (url: string) => void;
+  onSetImagePromptText: (text: string) => void;
+  onGenerateImage: (prompt: string) => Promise<void>;
+  onUploadClick: () => void;
+}) {
+  const sections = parseSectionPrompts(imagePromptText);
+  const hasMultiple = sections.length > 1;
+  const [generatingIdx, setGeneratingIdx] = useState<number | null>(null);
+  const sectionFileRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  async function generateSection(idx: number) {
+    setGeneratingIdx(idx);
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: sections[idx].prompt }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        onSetSectionImages((prev) => ({ ...prev, [idx]: data.url }));
+        if (idx === 0 && !imageUrl) {
+          onSetImageUrl(data.url);
+        }
+      }
+    } finally {
+      setGeneratingIdx(null);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <label className="text-sm font-medium">Images</label>
+
+      {/* Hero / main image */}
+      {imageUrl ? (
+        <div className="space-y-2">
+          <div className="overflow-hidden rounded-xl border border-border/40">
+            <img src={imageUrl} alt="Post image" className="h-auto w-full object-contain max-h-72" />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-9" onClick={onUploadClick}>Replace</Button>
+            <Button
+              variant="outline" size="sm" className="h-9 gap-1.5"
+              disabled={generatingImage || !imagePromptText.trim()}
+              onClick={() => onGenerateImage(sections[0]?.prompt || imagePromptText)}
+            >
+              {generatingImage ? <LoaderCircle className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              Regenerate
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 text-destructive hover:bg-destructive/10" onClick={() => onSetImageUrl("")}>Remove</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button variant="outline" className="h-11 flex-1 gap-2 border-dashed border-border/50" onClick={onUploadClick}>
+            <ImageIcon className="size-4" /> Upload
+          </Button>
+          <Button
+            className="h-11 flex-1 gap-2"
+            disabled={generatingImage || !imagePromptText.trim()}
+            onClick={() => onGenerateImage(sections[0]?.prompt || imagePromptText)}
+          >
+            {generatingImage ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            {generatingImage ? "Generating…" : "Generate Hero"}
+          </Button>
+        </div>
+      )}
+
+      {/* Section images for Substack */}
+      {hasMultiple ? (
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-muted-foreground">Section Images ({sections.length - 1})</p>
+          {sections.slice(1).map((sec, i) => {
+            const idx = i + 1;
+            const secImg = sectionImages[idx];
+            const isGen = generatingIdx === idx;
+            return (
+              <div key={idx} className="rounded-lg border border-border/40 bg-muted/10 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">{sec.label}</span>
+                  <div className="flex gap-1.5">
+                    <Button
+                      variant="outline" size="sm" className="h-8 gap-1.5"
+                      onClick={() => sectionFileRefs.current[idx]?.click()}
+                    >
+                      <ImageIcon className="size-3.5" />
+                      {secImg ? "Replace" : "Upload"}
+                    </Button>
+                    <Button
+                      size="sm" className="h-8 gap-1.5"
+                      disabled={isGen}
+                      onClick={() => generateSection(idx)}
+                    >
+                      {isGen ? <LoaderCircle className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                      {isGen ? "Generating…" : "Generate"}
+                    </Button>
+                    {secImg && (
+                      <Button
+                        variant="outline" size="sm" className="h-8 text-destructive hover:bg-destructive/10"
+                        onClick={() => onSetSectionImages((prev) => { const next = { ...prev }; delete next[idx]; return next; })}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{sec.prompt}</p>
+                {secImg ? (
+                  <div className="overflow-hidden rounded-lg border border-border/40">
+                    <img src={secImg} alt={sec.label} className="h-auto w-full object-contain max-h-56" />
+                  </div>
+                ) : null}
+                <input
+                  ref={(el) => { sectionFileRefs.current[idx] = el; }}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      compressImageFile(file).then((url) => onSetSectionImages((prev) => ({ ...prev, [idx]: url })));
+                    }
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {/* Editable prompt */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">Image Prompt{hasMultiple ? "s" : ""}</label>
+        <Textarea
+          className="min-h-[4rem] resize-y text-sm leading-6"
+          placeholder="Describe the image you want: style, subject, composition, mood…"
+          value={imagePromptText}
+          onChange={(e) => onSetImagePromptText(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function DraftEditorOverlay({
   post,
   onClose,
@@ -1389,11 +1584,19 @@ function DraftEditorOverlay({
 }) {
   const { savePostContent, updatePost } = useContentHub();
   const [prompt, setPrompt] = useState("");
+  const [promptExpanded, setPromptExpanded] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [sysPromptExpanded, setSysPromptExpanded] = useState(false);
+  const [sysPromptText, setSysPromptText] = useState("");
+  const [sysPromptDefault, setSysPromptDefault] = useState("");
+  const [sysPromptCustom, setSysPromptCustom] = useState(false);
+  const [savingSysPrompt, setSavingSysPrompt] = useState(false);
+  const sysPromptLoadedRef = useRef(false);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imagePromptText, setImagePromptText] = useState("");
+  const [sectionImages, setSectionImages] = useState<Record<number, string>>({});
   const [generatingImage, setGeneratingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1403,12 +1606,29 @@ function DraftEditorOverlay({
       setEditingContent(post.content || "");
       setImageUrl(post.imageUrl || "");
       setImagePromptText(post.imagePrompt || "");
+      const savedSections: Record<number, string> = {};
+      (post.sectionImages || []).forEach((url, i) => { if (url) savedSections[i + 1] = url; });
+      setSectionImages(savedSections);
       setGeneratedContent(null);
       setError(null);
       if (!prompt && post.title) {
-        setPrompt(`Write a ${post.platform === "substack" ? "long-form Substack article" : "LinkedIn post"} about: ${post.title}${post.content ? `\n\nContext: ${post.content}` : ""}`);
+        setPrompt(`Write a ${post.platform === "substack" ? "long-form Substack article" : "LinkedIn post"} about: ${post.title}`);
       }
     }
+  }, [post?.id]);
+
+  useEffect(() => {
+    if (sysPromptLoadedRef.current || !post) return;
+    sysPromptLoadedRef.current = true;
+    fetch("/api/settings/generate-prompts")
+      .then((r) => r.json())
+      .then((d) => {
+        const p = post.platform === "substack" ? d.substack : d.linkedin;
+        setSysPromptText(p.prompt);
+        setSysPromptCustom(p.isCustom);
+        setSysPromptDefault(post.platform === "substack" ? d.defaults.substack : d.defaults.linkedin);
+      })
+      .catch(() => {});
   }, [post?.id]);
 
   if (!post) return null;
@@ -1452,10 +1672,14 @@ function DraftEditorOverlay({
   function handleSave() {
     if (!post) return;
     savePostContent(post.id, editingContent);
+    const sectionImgArray = Object.keys(sectionImages)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((k) => sectionImages[Number(k)]);
     const patch: Partial<Post> = {};
     if (imageUrl !== (post.imageUrl || "")) patch.imageUrl = imageUrl || undefined;
     if (imagePromptText !== (post.imagePrompt || "")) patch.imagePrompt = imagePromptText || undefined;
-    if (Object.keys(patch).length > 0) updatePost(post.id, patch);
+    patch.sectionImages = sectionImgArray;
+    updatePost(post.id, patch);
     onClose();
   }
 
@@ -1468,8 +1692,7 @@ function DraftEditorOverlay({
   function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImageUrl(url);
+    compressImageFile(file).then(setImageUrl);
   }
 
   async function handleGenerateImage(imgPrompt: string) {
@@ -1528,27 +1751,36 @@ function DraftEditorOverlay({
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
           {/* Prompt */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Prompt</label>
-            <Textarea
-              className="min-h-[5rem] resize-y text-base leading-7"
-              placeholder={isLinkedIn
-                ? "e.g. Write a scroll-stopping LinkedIn post about..."
-                : "e.g. Write a deep-dive Substack article about..."
-              }
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button
-                className="h-10"
-                disabled={!prompt.trim() || generating}
-                onClick={handleGenerate}
-              >
-                {generating ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                {generating ? "Generating…" : "Generate"}
-              </Button>
-            </div>
+          <div className="rounded-xl border border-border/40 bg-muted/10 overflow-hidden">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm"
+              onClick={() => setPromptExpanded(!promptExpanded)}
+            >
+              <span className="font-medium">Prompt</span>
+              <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", promptExpanded && "rotate-180")} />
+            </button>
+            {promptExpanded && (
+              <div className="border-t border-border/40 px-4 py-3 space-y-2">
+                <Textarea
+                  className="min-h-[5rem] resize-y text-base leading-7"
+                  placeholder={isLinkedIn
+                    ? "e.g. Write a scroll-stopping LinkedIn post about..."
+                    : "e.g. Write a deep-dive Substack article about..."
+                  }
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                />
+                <Button
+                  className="h-10"
+                  disabled={!prompt.trim() || generating}
+                  onClick={handleGenerate}
+                >
+                  {generating ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                  {generating ? "Generating…" : "Generate"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {error ? (
@@ -1609,64 +1841,88 @@ function DraftEditorOverlay({
           </div>
 
           {/* Image */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Image</label>
-            {imageUrl ? (
-              <div className="space-y-2">
-                <div className="overflow-hidden rounded-xl border border-border/40">
-                  <img src={imageUrl} alt="Post image" className="h-auto max-h-64 w-full object-cover" />
-                </div>
+          <DraftImageSection
+            imageUrl={imageUrl}
+            imagePromptText={imagePromptText}
+            generatingImage={generatingImage}
+            sectionImages={sectionImages}
+            onSetSectionImages={setSectionImages}
+            onSetImageUrl={setImageUrl}
+            onSetImagePromptText={setImagePromptText}
+            onGenerateImage={handleGenerateImage}
+            onUploadClick={() => fileInputRef.current?.click()}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+
+          {/* System prompt editor */}
+          <div className="rounded-xl border border-border/40 bg-muted/10 overflow-hidden">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm"
+              onClick={() => setSysPromptExpanded(!sysPromptExpanded)}
+            >
+              <span className="flex items-center gap-2 font-medium">
+                System Prompt ({isSubstack ? "Substack" : "LinkedIn"})
+                {sysPromptCustom && <Badge variant="outline" className="text-xs ring-1 ring-inset ring-border/40">Custom</Badge>}
+              </span>
+              <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", sysPromptExpanded && "rotate-180")} />
+            </button>
+            {sysPromptExpanded && (
+              <div className="border-t border-border/40 px-4 py-4 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Controls how content is generated. Use {"{{title}}"} and {"{{context}}"} as placeholders.
+                </p>
+                <Textarea
+                  className="min-h-[12rem] resize-y font-mono text-sm leading-6"
+                  value={sysPromptText}
+                  onChange={(e) => setSysPromptText(e.target.value)}
+                />
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-9" onClick={() => fileInputRef.current?.click()}>
-                    Replace
+                  <Button
+                    size="sm" className="h-9" disabled={savingSysPrompt}
+                    onClick={async () => {
+                      setSavingSysPrompt(true);
+                      try {
+                        const res = await fetch("/api/settings/generate-prompts", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ platform: isSubstack ? "substack" : "linkedin", prompt: sysPromptText }),
+                        });
+                        const d = await res.json();
+                        if (d.prompt) { setSysPromptText(d.prompt); setSysPromptCustom(d.isCustom); }
+                      } finally { setSavingSysPrompt(false); }
+                    }}
+                  >
+                    {savingSysPrompt ? <LoaderCircle className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                    Save
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5"
-                    disabled={generatingImage || !imagePromptText.trim()}
-                    onClick={() => handleGenerateImage(imagePromptText)}
+                    size="sm" variant="outline" className="h-9" disabled={savingSysPrompt || !sysPromptCustom}
+                    onClick={async () => {
+                      setSavingSysPrompt(true);
+                      setSysPromptText(sysPromptDefault);
+                      try {
+                        const res = await fetch("/api/settings/generate-prompts", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ platform: isSubstack ? "substack" : "linkedin", prompt: null }),
+                        });
+                        const d = await res.json();
+                        setSysPromptText(d.prompt); setSysPromptCustom(false);
+                      } finally { setSavingSysPrompt(false); }
+                    }}
                   >
-                    {generatingImage ? <LoaderCircle className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                    Regenerate
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-9 text-destructive hover:bg-destructive/10" onClick={() => setImageUrl("")}>
-                    Remove
+                    Reset to Default
                   </Button>
                 </div>
               </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button variant="outline" className="h-11 flex-1 gap-2 border-dashed border-border/50" onClick={() => fileInputRef.current?.click()}>
-                  <ImageIcon className="size-4" />
-                  Upload
-                </Button>
-                <Button
-                  className="h-11 flex-1 gap-2"
-                  disabled={generatingImage || !imagePromptText.trim()}
-                  onClick={() => handleGenerateImage(imagePromptText)}
-                >
-                  {generatingImage ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  {generatingImage ? "Generating…" : "Generate"}
-                </Button>
-              </div>
             )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleImageUpload}
-            />
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Image Prompt</label>
-              <Textarea
-                className="min-h-[4rem] resize-y text-sm leading-6"
-                placeholder="Describe the image you want: style, subject, composition, mood…"
-                value={imagePromptText}
-                onChange={(e) => setImagePromptText(e.target.value)}
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -2121,15 +2377,30 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
                           />
                         </div>
 
-                        {post.imageUrl ? (
-                          <div className="mt-4 overflow-hidden rounded-2xl border border-border/40 bg-muted/20">
-                            <TappableImage
-                              src={post.imageUrl}
-                              alt={`Image for ${post.title}`}
-                              className="h-32 w-full object-cover lg:h-40"
-                            />
-                          </div>
-                        ) : null}
+                        {(() => {
+                          const isValidSrc = (url: string) => url && !url.startsWith("blob:");
+                          const allImages = [
+                            ...(post.imageUrl && isValidSrc(post.imageUrl) ? [{ src: post.imageUrl }] : []),
+                            ...(post.sectionImages ?? []).filter(isValidSrc).map((url) => ({ src: url })),
+                          ];
+                          if (allImages.length === 0) return null;
+                          const cols = allImages.length === 1 ? "grid-cols-1" : allImages.length === 2 ? "grid-cols-2" : "grid-cols-3";
+                          return (
+                            <div className={cn("mt-4 grid gap-1.5", cols)}>
+                              {allImages.map((img, i) => (
+                                <TappableImage
+                                  key={i}
+                                  src={img.src}
+                                  alt=""
+                                  className={cn(
+                                    "w-full rounded-lg border border-border/40 object-cover",
+                                    allImages.length === 1 ? "h-36" : "h-20",
+                                  )}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })()}
 
                         <div className="mt-4 space-y-2">
                           <div className="flex items-center gap-2">
@@ -2720,6 +2991,69 @@ function ImagePromptBlock({ prompt }: { prompt: string }) {
   );
 }
 
+function SectionImagePromptsBlock({ prompts }: { prompts: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+  function handleCopy(idx: number) {
+    navigator.clipboard.writeText(prompts[idx]);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  }
+
+  function handleCopyAll() {
+    navigator.clipboard.writeText(prompts.map((p, i) => `Section ${i + 1}: ${p}`).join("\n\n"));
+    setCopiedIdx(-1);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  }
+
+  return (
+    <div className="rounded-xl border border-border/40 bg-muted/20 overflow-hidden">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="flex items-center gap-2 font-medium text-foreground">
+          <ImageIcon className="size-4 text-muted-foreground" />
+          Section Images ({prompts.length})
+        </span>
+        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", expanded && "rotate-180")} />
+      </button>
+      {expanded ? (
+        <div className="border-t border-border/40 px-3 py-3 space-y-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={handleCopyAll}
+          >
+            {copiedIdx === -1 ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            {copiedIdx === -1 ? "Copied All" : "Copy All Prompts"}
+          </Button>
+          {prompts.map((p, i) => (
+            <div key={i} className="space-y-1.5 rounded-lg border border-border/30 bg-background/50 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-foreground">Section {i + 1}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                  onClick={() => handleCopy(i)}
+                >
+                  {copiedIdx === i ? <Check className="size-3" /> : <Copy className="size-3" />}
+                  {copiedIdx === i ? "Copied" : "Copy"}
+                </Button>
+              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">{p}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ResearchView() {
   const { addIdea } = useContentHub();
   const { options, loaded } = useCustomOptions();
@@ -2730,7 +3064,7 @@ function ResearchView() {
   const [additionalContext, setAdditionalContext] = useState("");
   const [resultCount, setResultCount] = useState(3);
   const [generating, setGenerating] = useState(false);
-  const [ideas, setIdeas] = useState<{ title: string; summary: string; signal: string; format: string; tags: string[]; imagePrompt?: string }[]>([]);
+  const [ideas, setIdeas] = useState<{ title: string; summary: string; signal: string; format: string; tags: string[]; imagePrompt?: string; sectionImagePrompts?: string[] }[]>([]);
   const [addedIndexes, setAddedIndexes] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
@@ -3010,6 +3344,9 @@ function ResearchView() {
                   {idea.imagePrompt ? (
                     <ImagePromptBlock prompt={idea.imagePrompt} />
                   ) : null}
+                  {idea.sectionImagePrompts && idea.sectionImagePrompts.length > 0 ? (
+                    <SectionImagePromptsBlock prompts={idea.sectionImagePrompts} />
+                  ) : null}
                 </CardContent>
                 <CardFooter className="border-t border-border/40 pt-4">
                   <Button
@@ -3017,10 +3354,17 @@ function ResearchView() {
                     variant={added ? "outline" : "default"}
                     disabled={added}
                     onClick={() => {
+                      const allPrompts = [
+                        idea.imagePrompt,
+                        ...(idea.sectionImagePrompts ?? []),
+                      ].filter(Boolean);
+                      const combinedImagePrompt = allPrompts.length > 1
+                        ? `Hero: ${allPrompts[0]}\n\n${allPrompts.slice(1).map((p, i) => `Section ${i + 1}: ${p}`).join("\n\n")}`
+                        : allPrompts[0] || undefined;
                       addIdea({
                         title: idea.title,
                         description: `${idea.summary}\n\nSignal: ${idea.signal}\nFormat: ${idea.format}`,
-                        imagePrompt: idea.imagePrompt,
+                        imagePrompt: combinedImagePrompt,
                         platform: selectedChannel?.toLowerCase() === "substack" ? "substack" : selectedChannel?.toLowerCase() === "linkedin" ? "linkedin" : "both",
                         postType: "trenches",
                         priority: "medium",

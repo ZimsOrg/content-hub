@@ -19,6 +19,7 @@ export async function POST() {
     await sql.query(`ALTER TABLE posts ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE`);
     await sql.query(`ALTER TABLE ideas ADD COLUMN IF NOT EXISTS image_prompt TEXT`);
     await sql.query(`ALTER TABLE posts ADD COLUMN IF NOT EXISTS image_prompt TEXT`);
+    await sql.query(`ALTER TABLE posts ADD COLUMN IF NOT EXISTS section_images JSONB DEFAULT '[]'`);
 
     return Response.json({ ok: true });
   } catch (error) {

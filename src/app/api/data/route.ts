@@ -115,6 +115,7 @@ async function readPosts(): Promise<Post[]> {
       revisions: revisionsByPost.get(postId) || [],
       metrics: metricsByPost.get(postId),
       imagePrompt: (r.image_prompt as string) || undefined,
+      sectionImages: (r.section_images as string[]) || [],
       archived: (r.archived as boolean) ?? false,
       createdAt: (r.created_at as Date).toISOString(),
       updatedAt: (r.updated_at as Date).toISOString(),
@@ -243,8 +244,8 @@ export async function PUT(request: Request) {
     // Upsert posts + nested data
     for (const post of payload.posts) {
       await sql.query(
-        `INSERT INTO posts (id, idea_id, title, content, image_url, platform, post_type, scheduled_at, status, approval_status, image_prompt, archived, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        `INSERT INTO posts (id, idea_id, title, content, image_url, platform, post_type, scheduled_at, status, approval_status, image_prompt, section_images, archived, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          ON CONFLICT (id) DO UPDATE SET
            idea_id = EXCLUDED.idea_id,
            title = EXCLUDED.title,
@@ -256,6 +257,7 @@ export async function PUT(request: Request) {
            status = EXCLUDED.status,
            approval_status = EXCLUDED.approval_status,
            image_prompt = EXCLUDED.image_prompt,
+           section_images = EXCLUDED.section_images,
            archived = EXCLUDED.archived,
            updated_at = EXCLUDED.updated_at`,
         [
@@ -264,7 +266,8 @@ export async function PUT(request: Request) {
           post.scheduledAt,
           post.status,
           resolveApprovalStatus(post.status, post.approvalStatus),
-          post.imagePrompt || null, post.archived ?? false,
+          post.imagePrompt || null, JSON.stringify(post.sectionImages || []),
+          post.archived ?? false,
           post.createdAt, post.updatedAt,
         ],
       );

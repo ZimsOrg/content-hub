@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "user",
-            content: `Generate an image based on this description: ${prompt.trim()}`,
+            content: `Generate a small, optimized image (max 800x600 pixels) based on this description: ${prompt.trim()}`,
           },
         ],
       }),
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
 
     let imageUrl: string | null = null;
 
-    // Check message.images array (Gemini/Google models)
     if (Array.isArray(images)) {
       for (const img of images) {
         if (img.image_url?.url) { imageUrl = img.image_url.url; break; }
@@ -66,7 +65,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Check content array
     if (!imageUrl && Array.isArray(content)) {
       for (const part of content) {
         if (part.type === "image_url" && part.image_url?.url) { imageUrl = part.image_url.url; break; }
@@ -76,7 +74,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Check content string
     if (!imageUrl && typeof content === "string") {
       const b64 = content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
       if (b64) imageUrl = b64[0];
