@@ -1089,7 +1089,20 @@ function BoardCardDialog({
                 <PlatformSelect
                   value={activePost.platform}
                   showBoth={false}
-                  onChange={(p) => { if (p !== "both") updatePost(activePost.id, { platform: p as PostPlatform }); }}
+                  onChange={(p) => {
+                    if (p === "both") return;
+                    const patch: Partial<Post> = { platform: p as PostPlatform };
+                    const currentPrompt = activePost.imagePrompt || "";
+                    if (p === "substack" && !currentPrompt.includes("Section ")) {
+                      const hero = currentPrompt.replace(/^Hero:\s*/i, "").trim() || `Eye-catching hero image for "${activePost.title}", Studio Ghibli soft watercolor style, warm muted tones`;
+                      patch.imagePrompt = `Hero: ${hero}\n\nSection 1: Diagram or whiteboard sketch illustrating the main concept, Studio Ghibli soft watercolor style\n\nSection 2: Infographic showing key data or steps, clean layout, warm muted tones\n\nSection 3: Screenshot-style mockup or visual example, minimal, soft colors`;
+                    } else if (p === "linkedin" && currentPrompt.includes("Section ")) {
+                      const heroMatch = currentPrompt.match(/^Hero:\s*([\s\S]+?)(?=\n\nSection \d|$)/);
+                      patch.imagePrompt = heroMatch ? heroMatch[1].trim() : currentPrompt.split("\n\n")[0].replace(/^Hero:\s*/i, "").trim() || currentPrompt;
+                      patch.sectionImages = [];
+                    }
+                    updatePost(activePost.id, patch);
+                  }}
                 />
               </div>
 
@@ -1530,6 +1543,7 @@ function DraftImageSection({
   imagePromptText,
   generatingImage,
   sectionImages,
+  platform,
   onSetSectionImages,
   onSetImageUrl,
   onSetImagePromptText,
@@ -1540,13 +1554,26 @@ function DraftImageSection({
   imagePromptText: string;
   generatingImage: boolean;
   sectionImages: Record<number, string>;
+  platform: string;
   onSetSectionImages: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
   onSetImageUrl: (url: string) => void;
   onSetImagePromptText: (text: string) => void;
   onGenerateImage: (prompt: string) => Promise<void>;
   onUploadClick: () => void;
 }) {
-  const sections = parseSectionPrompts(imagePromptText);
+  const isSubstack = platform === "substack";
+  let sections = parseSectionPrompts(imagePromptText);
+
+  if (isSubstack && sections.length <= 1) {
+    const hero = sections[0]?.prompt || "";
+    sections = [
+      { label: "Hero", prompt: hero },
+      { label: "Section 1", prompt: "" },
+      { label: "Section 2", prompt: "" },
+      { label: "Section 3", prompt: "" },
+    ];
+  }
+
   const hasMultiple = sections.length > 1;
   const [generatingIdx, setGeneratingIdx] = useState<number | null>(null);
   const sectionFileRefs = useRef<Record<number, HTMLInputElement | null>>({});
@@ -1648,7 +1675,11 @@ function DraftImageSection({
                     )}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">{sec.prompt}</p>
+                {sec.prompt ? (
+                  <p className="text-xs text-muted-foreground">{sec.prompt}</p>
+                ) : (
+                  <p className="text-xs italic text-muted-foreground/60">No prompt yet. Use the image prompt field below to add section prompts.</p>
+                )}
                 {secImg ? (
                   <div className="overflow-hidden rounded-lg border border-border/40">
                     <img src={secImg} alt={sec.label} className="h-auto w-full object-contain max-h-56" />
@@ -1663,7 +1694,7 @@ function DraftImageSection({
                     const file = e.target.files?.[0];
                     if (file && file.size <= 10 * 1024 * 1024) {
                       compressImageFile(file).then((url) => {
-                        if (url.length <= 500_000) onSetSectionImages((prev) => ({ ...prev, [idx]: url }));
+                        if (url.length <= 2_000_000) onSetSectionImages((prev) => ({ ...prev, [idx]: url }));
                       });
                     }
                   }}
@@ -1724,11 +1755,18 @@ function DraftEditorOverlay({
       setSectionImages(savedSections);
       setGeneratedContent(null);
       setError(null);
-      if (!prompt && post.title) {
-        setPrompt(`Write a ${post.platform === "substack" ? "long-form Substack article" : "LinkedIn post"} about: ${post.title}`);
-      }
+      setPrompt(`Write a ${post.platform === "substack" ? "long-form Substack article" : "LinkedIn post"} about: ${post.title}`);
     }
   }, [post?.id]);
+
+  useEffect(() => {
+    if (post) {
+      setImagePromptText(post.imagePrompt || "");
+      const savedSections: Record<number, string> = {};
+      (post.sectionImages || []).forEach((url, i) => { if (url) savedSections[i + 1] = url; });
+      setSectionImages(savedSections);
+    }
+  }, [post?.imagePrompt, post?.sectionImages?.length]);
 
   useEffect(() => {
     if (sysPromptLoadedRef.current || !post) return;
@@ -1971,6 +2009,7 @@ function DraftEditorOverlay({
             imagePromptText={imagePromptText}
             generatingImage={generatingImage}
             sectionImages={sectionImages}
+            platform={post.platform}
             onSetSectionImages={setSectionImages}
             onSetImageUrl={setImageUrl}
             onSetImagePromptText={setImagePromptText}
