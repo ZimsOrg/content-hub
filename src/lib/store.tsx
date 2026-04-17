@@ -369,6 +369,12 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
             post.id === postId ? { ...post, ...patch, updatedAt: new Date().toISOString() } : post,
           ),
         }));
+
+        void fetch("/api/posts", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: postId, ...patch }),
+        }).catch((err) => console.error("Failed to patch post:", err));
       },
       setPostStatus: async (postId, status) => {
         const previousPost = data.posts.find((post) => post.id === postId);

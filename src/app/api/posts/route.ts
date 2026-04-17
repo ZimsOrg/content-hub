@@ -4,6 +4,59 @@ import { v4 as uuidv4 } from "uuid";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+export async function PATCH(request: Request) {
+  try {
+    const { id, ...patch } = (await request.json()) as { id: string; [key: string]: unknown };
+
+    if (!id) {
+      return Response.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const fieldMap: Record<string, string> = {
+      scheduledAt: "scheduled_at",
+      imageUrl: "image_url",
+      imagePrompt: "image_prompt",
+      sectionImages: "section_images",
+      status: "status",
+      approvalStatus: "approval_status",
+      title: "title",
+      content: "content",
+      archived: "archived",
+    };
+
+    const sets: string[] = ["updated_at = NOW()"];
+    const values: unknown[] = [id];
+    let paramIdx = 2;
+
+    for (const [key, value] of Object.entries(patch)) {
+      const col = fieldMap[key];
+      if (!col) continue;
+      if (key === "sectionImages") {
+        sets.push(`${col} = $${paramIdx}::jsonb`);
+        values.push(JSON.stringify(value));
+      } else {
+        sets.push(`${col} = $${paramIdx}`);
+        values.push(value ?? null);
+      }
+      paramIdx++;
+    }
+
+    if (sets.length <= 1) {
+      return Response.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    await sql.query(
+      `UPDATE posts SET ${sets.join(", ")} WHERE id = $1`,
+      values,
+    );
+
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error("PATCH /api/posts error:", error);
+    return Response.json({ error: "Failed to update post." }, { status: 500 });
+  }
+}
+
 // POST /api/posts — add a new post (draft)
 export async function POST(request: Request) {
   try {

@@ -543,6 +543,40 @@ function PlatformBadge({ platform }: { platform: Platform }) {
 }
 
 
+function PlatformSelect({
+  value,
+  onChange,
+  showBoth = true,
+}: {
+  value: Platform;
+  onChange: (platform: Platform) => void;
+  showBoth?: boolean;
+}) {
+  const platforms: Platform[] = showBoth ? ["linkedin", "substack", "both"] : ["linkedin", "substack"];
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {platforms.map((p) => {
+        const meta = PLATFORM_META[p];
+        const active = value === p;
+        return (
+          <button
+            key={p}
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition",
+              active ? meta.pill : "ring-border/40 text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => onChange(p)}
+          >
+            <Circle className={cn("size-2", active ? "fill-current" : "fill-muted-foreground/40")} />
+            {meta.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function StatusBadge({
   value,
 }: {
@@ -768,6 +802,45 @@ function PreviewText({
   );
 }
 
+function EditableTitle({ value, onSave }: { value: string; onSave: (next: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  function save() {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="w-full text-left text-xl font-semibold leading-tight hover:text-foreground/70 transition"
+        onClick={() => setEditing(true)}
+        title="Click to edit title"
+      >
+        {value}
+      </button>
+    );
+  }
+
+  return (
+    <Input
+      ref={inputRef}
+      className="h-auto border-0 bg-transparent px-0 text-xl font-semibold leading-tight shadow-none focus-visible:ring-0"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setDraft(value); setEditing(false); } }}
+    />
+  );
+}
+
 function EditableContentBlock({
   label,
   value,
@@ -911,16 +984,44 @@ function BoardCardDialog({
         {activeIdea ? (
           <>
             <DialogHeader className="pr-12 overflow-hidden pt-2 pb-3 border-b border-border/40">
-              <DialogTitle className="text-xl leading-tight">{activeIdea.title}</DialogTitle>
+              <DialogTitle className="text-xl leading-tight">
+                <EditableTitle value={activeIdea.title} onSave={(t) => updateIdea(activeIdea.id, { title: t })} />
+              </DialogTitle>
               <div className="flex flex-wrap gap-2">
                 <Badge className={cn("ring-1 ring-inset", PRIORITY_META[activeIdea.priority].badge)} variant="outline">
                   {PRIORITY_META[activeIdea.priority].label}
                 </Badge>
-                <PlatformBadge platform={activeIdea.platform} />
               </div>
             </DialogHeader>
 
             <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Platform</label>
+                <PlatformSelect
+                  value={activeIdea.platform}
+                  onChange={(p) => updateIdea(activeIdea.id, { platform: p })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Priority</label>
+                <div className="flex gap-1.5">
+                  {(["high", "medium", "low"] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={cn(
+                        "rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition",
+                        activeIdea.priority === p ? PRIORITY_META[p].badge : "ring-border/40 text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => updateIdea(activeIdea.id, { priority: p })}
+                    >
+                      {PRIORITY_META[p].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <EditableContentBlock
                 label="Description"
                 value={activeIdea.description ?? ""}
@@ -969,9 +1070,10 @@ function BoardCardDialog({
         {activePost ? (
           <>
             <DialogHeader className="pr-12 overflow-hidden pt-2 pb-3 border-b border-border/40">
-              <DialogTitle className="text-xl leading-tight">{activePost.title}</DialogTitle>
+              <DialogTitle className="text-xl leading-tight">
+                <EditableTitle value={activePost.title} onSave={(t) => updatePost(activePost.id, { title: t })} />
+              </DialogTitle>
               <div className="flex flex-wrap items-center gap-2">
-                <PlatformBadge platform={activePost.platform} />
                 <StatusBadge value={activePost.status} />
                 {(activePost.status === "approved" || activePost.status === "posted") && (
                   <span className="text-sm text-muted-foreground">
@@ -982,6 +1084,15 @@ function BoardCardDialog({
             </DialogHeader>
 
             <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Platform</label>
+                <PlatformSelect
+                  value={activePost.platform}
+                  showBoth={false}
+                  onChange={(p) => { if (p !== "both") updatePost(activePost.id, { platform: p as PostPlatform }); }}
+                />
+              </div>
+
               <CardStatusSelect
                 value={activePost.status}
                 options={POST_STATUS_OPTIONS}
@@ -1162,7 +1273,7 @@ function CalendarView() {
     end: calendarMode === "month" ? monthEnd : weekEnd,
   });
   const calendarPosts = data.posts.filter(
-    (post) => post.approvalStatus === "approved" || post.status === "posted",
+    (post) => (post.status === "approved" || post.status === "posted") && !post.archived,
   );
   const agenda = sortPostsByScheduledDate(calendarPosts.filter((post) => postMatchesDate(post, selectedDate)));
   const calendarLabel =
@@ -1380,7 +1491,7 @@ function simpleMarkdownToHtml(md: string): string {
     .replace(/$/, "</p>");
 }
 
-function compressImageFile(file: File, maxWidth = 800, quality = 0.7): Promise<string> {
+function compressImageFile(file: File, maxWidth = 600, quality = 0.6): Promise<string> {
   return new Promise((resolve) => {
     const img = new window.Image();
     img.onload = () => {
@@ -1550,8 +1661,10 @@ function DraftImageSection({
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) {
-                      compressImageFile(file).then((url) => onSetSectionImages((prev) => ({ ...prev, [idx]: url })));
+                    if (file && file.size <= 10 * 1024 * 1024) {
+                      compressImageFile(file).then((url) => {
+                        if (url.length <= 500_000) onSetSectionImages((prev) => ({ ...prev, [idx]: url }));
+                      });
                     }
                   }}
                 />
@@ -1692,7 +1805,19 @@ function DraftEditorOverlay({
   function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    compressImageFile(file).then(setImageUrl);
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setError(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 10MB.`);
+      return;
+    }
+    setError(null);
+    compressImageFile(file).then((url) => {
+      if (url.length > 2_000_000) {
+        setError("Image is still too large after compression. Try a smaller image.");
+        return;
+      }
+      setImageUrl(url);
+    });
   }
 
   async function handleGenerateImage(imgPrompt: string) {
