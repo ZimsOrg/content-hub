@@ -61,6 +61,7 @@ export async function PATCH(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
+      id?: string;
       title: string;
       content: string;
       ideaId?: string;
@@ -72,24 +73,25 @@ export async function POST(request: Request) {
       approvalStatus?: string;
     };
 
-    if (!body.title?.trim() || !body.content?.trim()) {
+    if (!body.title?.trim()) {
       return Response.json(
-        { error: "title and content are required" },
+        { error: "title is required" },
         { status: 400 },
       );
     }
 
-    const id = uuidv4();
+    const id = body.id || uuidv4();
     const now = new Date().toISOString();
 
     await sql.query(
       `INSERT INTO posts (id, idea_id, title, content, image_url, platform, post_type, scheduled_at, status, approval_status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (id) DO NOTHING`,
       [
         id,
         body.ideaId || null,
         body.title.trim(),
-        body.content.trim(),
+        (body.content || "").trim(),
         body.imageUrl || null,
         body.platform || "linkedin",
         body.postType || "trenches",
@@ -110,5 +112,18 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/posts error:", error);
     return Response.json({ error: "Failed to create post." }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) return Response.json({ error: "id required" }, { status: 400 });
+    await sql.query("DELETE FROM posts WHERE id = $1", [id]);
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error("DELETE /api/posts error:", error);
+    return Response.json({ error: "Failed to delete post." }, { status: 500 });
   }
 }

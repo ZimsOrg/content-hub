@@ -242,6 +242,22 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
         };
 
         setData((current) => ({ ...current, ideas: [idea, ...current.ideas] }));
+
+        void fetch("/api/ideas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: idea.id,
+            title: idea.title,
+            description: idea.description,
+            platform: idea.platform,
+            postType: idea.postType,
+            priority: idea.priority,
+            status: idea.status,
+            tags: idea.tags,
+            imagePrompt: idea.imagePrompt,
+          }),
+        }).catch((err) => console.error("Failed to persist idea:", err));
       },
       updateIdea: (ideaId, patch) => {
         setData((current) => ({
@@ -295,12 +311,14 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           ...current,
           ideas: current.ideas.filter((idea) => idea.id !== ideaId),
         }));
+        void fetch(`/api/ideas?id=${ideaId}`, { method: "DELETE" }).catch((err) => console.error("Failed to delete idea:", err));
       },
       deletePost: (postId) => {
         setData((current) => ({
           ...current,
           posts: current.posts.filter((post) => post.id !== postId),
         }));
+        void fetch(`/api/posts?id=${postId}`, { method: "DELETE" }).catch((err) => console.error("Failed to delete post:", err));
       },
       archiveIdea: (ideaId) => {
         setData((current) => ({
@@ -361,6 +379,22 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
           ...current,
           posts: [post, ...current.posts],
         }));
+
+        void fetch("/api/posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            ideaId: post.ideaId,
+            platform: post.platform,
+            postType: post.postType,
+            scheduledAt: post.scheduledAt,
+            status: post.status,
+            approvalStatus: post.approvalStatus,
+          }),
+        }).catch((err) => console.error("Failed to persist post:", err));
       },
       updatePost: (postId, patch) => {
         setData((current) => ({
@@ -458,6 +492,28 @@ export function ContentHubProvider({ children }: { children: ReactNode }) {
               : idea,
           ),
         }));
+
+        void fetch("/api/posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            ideaId: post.ideaId,
+            platform: post.platform,
+            postType: post.postType,
+            scheduledAt: post.scheduledAt,
+            status: post.status,
+            approvalStatus: post.approvalStatus,
+          }),
+        }).catch((err) => console.error("Failed to persist scheduled post:", err));
+
+        void fetch("/api/data", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entity: "idea", id: ideaId, status: "ready" }),
+        }).catch((err) => console.error("Failed to update idea status:", err));
       },
       addComment: (postId, text, author = "zima") => {
         if (!text.trim()) {

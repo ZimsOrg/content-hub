@@ -1484,7 +1484,8 @@ function CalendarView() {
   );
 }
 
-function simpleMarkdownToHtml(md: string): string {
+function simpleMarkdownToHtml(md: string, images?: { hero?: string; sections?: Record<number, string> }): string {
+  let imageIdx = 0;
   return md
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -1495,7 +1496,14 @@ function simpleMarkdownToHtml(md: string): string {
     .replace(/^&gt; (.+)$/gm, "<blockquote><p>$1</p></blockquote>")
     .replace(/^---$/gm, "<hr />")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\[IMAGE: (.+?)\]/g, '<div class="rounded-lg border-2 border-dashed border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground my-4">📷 <strong>Image:</strong> $1</div>')
+    .replace(/\[IMAGE: (.+?)\]/g, () => {
+      imageIdx++;
+      const src = images?.sections?.[imageIdx];
+      if (src) {
+        return `<div class="my-6"><img src="${src}" alt="" class="w-full rounded-xl" /></div>`;
+      }
+      return `<div class="rounded-lg border-2 border-dashed border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground my-6">📷 <strong>Image placeholder ${imageIdx}</strong></div>`;
+    })
     .replace(/^(\d+)\. (.+)$/gm, "<li>$1. $2</li>")
     .replace(/^- (.+)$/gm, "<li>• $1</li>")
     .replace(/\n\n/g, "</p><p>")
@@ -1562,19 +1570,33 @@ function DraftImageSection({
   onUploadClick: () => void;
 }) {
   const isSubstack = platform === "substack";
-  let sections = parseSectionPrompts(imagePromptText);
+  const parsed = parseSectionPrompts(imagePromptText);
+  const hasMultiple = isSubstack;
 
-  if (isSubstack && sections.length <= 1) {
-    const hero = sections[0]?.prompt || "";
-    sections = [
-      { label: "Hero", prompt: hero },
-      { label: "Section 1", prompt: "" },
-      { label: "Section 2", prompt: "" },
-      { label: "Section 3", prompt: "" },
-    ];
+  const sections: { label: string; prompt: string }[] = isSubstack
+    ? [
+        { label: "Hero", prompt: parsed.find((s) => s.label === "Hero")?.prompt || (parsed.length === 1 && parsed[0].label === "Image" ? parsed[0].prompt : "") },
+        { label: "Section 1", prompt: parsed.find((s) => s.label === "Section 1")?.prompt || "" },
+        { label: "Section 2", prompt: parsed.find((s) => s.label === "Section 2")?.prompt || "" },
+        { label: "Section 3", prompt: parsed.find((s) => s.label === "Section 3")?.prompt || "" },
+      ]
+    : parsed.length > 0 ? parsed : [{ label: "Image", prompt: imagePromptText }];
+
+  function rebuildPrompt(updated: { label: string; prompt: string }[]) {
+    if (!isSubstack) {
+      onSetImagePromptText(updated[0]?.prompt || "");
+      return;
+    }
+    const parts = updated.map((s) =>
+      s.label === "Hero" ? `Hero: ${s.prompt}` : `${s.label}: ${s.prompt}`,
+    );
+    onSetImagePromptText(parts.join("\n\n"));
   }
 
-  const hasMultiple = sections.length > 1;
+  function updateSection(sectionIdx: number, newPrompt: string) {
+    const updated = sections.map((s, i) => i === sectionIdx ? { ...s, prompt: newPrompt } : s);
+    rebuildPrompt(updated);
+  }
   const [generatingIdx, setGeneratingIdx] = useState<number | null>(null);
   const sectionFileRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
@@ -1637,6 +1659,15 @@ function DraftImageSection({
         </div>
       )}
 
+      {hasMultiple && (
+        <Input
+          className="h-9 text-xs"
+          placeholder="Describe the hero image…"
+          value={sections[0]?.prompt || ""}
+          onChange={(e) => updateSection(0, e.target.value)}
+        />
+      )}
+
       {/* Section images for Substack */}
       {hasMultiple ? (
         <div className="space-y-3">
@@ -1675,11 +1706,12 @@ function DraftImageSection({
                     )}
                   </div>
                 </div>
-                {sec.prompt ? (
-                  <p className="text-xs text-muted-foreground">{sec.prompt}</p>
-                ) : (
-                  <p className="text-xs italic text-muted-foreground/60">No prompt yet. Use the image prompt field below to add section prompts.</p>
-                )}
+                <Input
+                  className="h-9 text-xs"
+                  placeholder={`Describe the ${sec.label.toLowerCase()} image…`}
+                  value={sec.prompt}
+                  onChange={(e) => updateSection(idx, e.target.value)}
+                />
                 {secImg ? (
                   <div className="overflow-hidden rounded-lg border border-border/40">
                     <img src={secImg} alt={sec.label} className="h-auto w-full object-contain max-h-56" />
@@ -1705,16 +1737,17 @@ function DraftImageSection({
         </div>
       ) : null}
 
-      {/* Editable prompt */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Image Prompt{hasMultiple ? "s" : ""}</label>
-        <Textarea
-          className="min-h-[4rem] resize-y text-sm leading-6"
-          placeholder="Describe the image you want: style, subject, composition, mood…"
-          value={imagePromptText}
-          onChange={(e) => onSetImagePromptText(e.target.value)}
-        />
-      </div>
+      {!hasMultiple && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Image Prompt</label>
+          <Textarea
+            className="min-h-[4rem] resize-y text-sm leading-6"
+            placeholder="Describe the image you want: style, subject, composition, mood…"
+            value={imagePromptText}
+            onChange={(e) => onSetImagePromptText(e.target.value)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1729,6 +1762,7 @@ function DraftEditorOverlay({
   const { savePostContent, updatePost } = useContentHub();
   const [prompt, setPrompt] = useState("");
   const [promptExpanded, setPromptExpanded] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sysPromptExpanded, setSysPromptExpanded] = useState(false);
   const [sysPromptText, setSysPromptText] = useState("");
@@ -1981,26 +2015,70 @@ function DraftEditorOverlay({
             </div>
           ) : null}
 
-          {/* Content editor */}
+          {/* Content editor / preview */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Content</label>
-            <Textarea
-              className={cn(
-                "w-full resize-y font-sans text-base leading-7",
-                isSubstack ? "min-h-[24rem]" : "min-h-[12rem]",
-              )}
-              value={editingContent}
-              onChange={(e) => setEditingContent(e.target.value)}
-              placeholder={isSubstack
-                ? "Write your long-form article here..."
-                : "Write your post here..."
-              }
-            />
-            {isLinkedIn && editingContent.length > 0 ? (
-              <p className={cn("text-xs", editingContent.length > 1300 ? "text-destructive" : "text-muted-foreground")}>
-                {editingContent.length} / 1,300 characters
-              </p>
-            ) : null}
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Content</label>
+              <div className="inline-flex rounded-lg border border-border/40 bg-muted/30 p-0.5">
+                {(["edit", "preview"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={cn(
+                      "rounded-md px-3 py-1 text-xs font-medium transition",
+                      (mode === "edit" ? !previewMode : previewMode)
+                        ? "bg-foreground text-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setPreviewMode(mode === "preview")}
+                  >
+                    {mode === "edit" ? "Edit" : "Preview"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {previewMode ? (
+              <div className="rounded-xl border border-border/40 bg-background">
+                {/* Substack-style preview */}
+                <div className="mx-auto max-w-2xl px-6 py-8">
+                  {imageUrl && (
+                    <div className="mb-8 -mx-6 overflow-hidden rounded-none sm:rounded-xl">
+                      <img src={imageUrl} alt="" className="w-full object-cover" />
+                    </div>
+                  )}
+                  <div
+                    className="prose prose-lg dark:prose-invert max-w-none [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mt-0 [&_h1]:mb-6 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-10 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-8 [&_h3]:mb-3 [&_p]:text-base [&_p]:leading-8 [&_p]:mb-5 [&_p]:text-foreground/90 [&_blockquote]:border-l-4 [&_blockquote]:border-foreground/20 [&_blockquote]:pl-5 [&_blockquote]:italic [&_blockquote]:text-foreground/70 [&_blockquote]:my-8 [&_hr]:my-10 [&_hr]:border-border/40 [&_ul]:space-y-2 [&_ol]:space-y-2 [&_li]:text-base [&_li]:leading-8 [&_strong]:text-foreground [&_img]:rounded-xl [&_img]:my-6"
+                    dangerouslySetInnerHTML={{
+                      __html: simpleMarkdownToHtml(editingContent, {
+                        hero: imageUrl,
+                        sections: sectionImages,
+                      }),
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <Textarea
+                  className={cn(
+                    "w-full resize-y font-sans text-base leading-7",
+                    isSubstack ? "min-h-[24rem]" : "min-h-[12rem]",
+                  )}
+                  value={editingContent}
+                  onChange={(e) => setEditingContent(e.target.value)}
+                  placeholder={isSubstack
+                    ? "Write your long-form article here..."
+                    : "Write your post here..."
+                  }
+                />
+                {isLinkedIn && editingContent.length > 0 ? (
+                  <p className={cn("text-xs", editingContent.length > 1300 ? "text-destructive" : "text-muted-foreground")}>
+                    {editingContent.length} / 1,300 characters
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
 
           {/* Image */}
@@ -2254,7 +2332,7 @@ function NewCardDialog({
 }
 
 function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
-  const { data, setIdeaStatus, setPostStatus, updateIdea, scheduleIdea, deleteIdea, deletePost, archiveIdea, archivePost, unarchiveIdea, unarchivePost } = useContentHub();
+  const { data, addIdea, setIdeaStatus, setPostStatus, updateIdea, addPost, deleteIdea, deletePost, archiveIdea, archivePost, unarchiveIdea, unarchivePost } = useContentHub();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<"idea" | "post" | null>(null);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
@@ -2274,10 +2352,7 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
     setPendingDelete(null);
   }
   const ideas = sortByNewest(
-    data.ideas.filter((idea) =>
-      (showArchived || !idea.archived) &&
-      (!idea.scheduledPostIds || idea.scheduledPostIds.length === 0),
-    ),
+    data.ideas.filter((idea) => showArchived || !idea.archived),
   );
   const ideaPosts = sortByNewest(
     data.posts.filter((post) => post.status === "idea" && (showArchived || !post.archived)),
@@ -2301,16 +2376,28 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
   }
 
   async function handlePostStatusChange(postId: string, status: Post["status"]) {
+    if (status === "idea") {
+      const post = data.posts.find((p) => p.id === postId);
+      if (post) {
+        addIdea({
+          title: post.title,
+          description: post.content,
+          platform: post.platform,
+          postType: post.postType,
+          priority: "medium",
+          status: "new",
+          tags: [],
+          imagePrompt: post.imagePrompt,
+        });
+        deletePost(postId);
+      }
+      return;
+    }
+
     const key = `post:${postId}`;
     setSavingStatusKey(key);
     try {
       await setPostStatus(postId, status);
-      if (status === "idea") {
-        const post = data.posts.find((p) => p.id === postId);
-        if (post?.ideaId) {
-          updateIdea(post.ideaId, { scheduledPostIds: [] });
-        }
-      }
     } finally {
       setSavingStatusKey((current) => (current === key ? null : current));
     }
@@ -2455,25 +2542,20 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
                             value="idea"
                             options={POST_STATUS_OPTIONS}
                             onChange={(status) => {
-                              if (status !== "idea") {
-                                const plat = idea.platform === "both" ? "linkedin" : idea.platform;
-                                const tomorrow = new Date();
-                                tomorrow.setDate(tomorrow.getDate() + 1);
-                                tomorrow.setHours(9, 0, 0, 0);
-                                scheduleIdea({
-                                  ideaId: idea.id,
-                                  title: idea.title,
-                                  content: idea.description ?? "",
-                                  scheduledAt: tomorrow.toISOString(),
-                                  platform: plat as PostPlatform,
-                                });
-                                if (status !== "draft") {
-                                  const newPost = data.posts.find((p) => p.ideaId === idea.id);
-                                  if (newPost) {
-                                    void handlePostStatusChange(newPost.id, status as Post["status"]);
-                                  }
-                                }
-                              }
+                              if (status === "idea") return;
+                              const plat = idea.platform === "both" ? "linkedin" : idea.platform;
+                              const tomorrow = new Date();
+                              tomorrow.setDate(tomorrow.getDate() + 1);
+                              tomorrow.setHours(9, 0, 0, 0);
+                              addPost({
+                                title: idea.title,
+                                content: idea.description ?? "",
+                                platform: plat as PostPlatform,
+                                postType: idea.postType,
+                                scheduledAt: tomorrow.toISOString(),
+                                status: status as PostStatus,
+                              });
+                              deleteIdea(idea.id);
                             }}
                           />
                           <div className="flex justify-end gap-1">
