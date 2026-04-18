@@ -1112,15 +1112,13 @@ function BoardCardDialog({
                 onChange={(status) => onMovePostStatus(activePost.id, status as Post["status"])}
               />
 
-              {activePost.status === "draft" && (
-                <Button
-                  className="h-11 w-full gap-2 text-base"
-                  onClick={() => { onEditPost(activePost.id); onOpenChange(false); }}
-                >
-                  <PencilLine className="size-4" />
-                  Open Draft Editor
-                </Button>
-              )}
+              <Button
+                className="h-11 w-full gap-2 text-base"
+                onClick={() => { onEditPost(activePost.id); onOpenChange(false); }}
+              >
+                {activePost.status === "draft" ? <PencilLine className="size-4" /> : <Eye className="size-4" />}
+                {activePost.status === "draft" ? "Open Draft Editor" : "View & Edit"}
+              </Button>
 
               {(activePost.status === "approved" || activePost.status === "posted") && (
                 <div className="space-y-1.5">
@@ -2661,17 +2659,15 @@ function BoardView({ onEditPost }: { onEditPost: (postId: string) => void }) {
                             {isSaving ? <LoaderCircle className="size-4 animate-spin text-muted-foreground" /> : null}
                           </div>
                           <div className="flex justify-end gap-1">
-                            {post.status === "draft" && (
-                              <Button
-                                variant="ghost"
-                                size="icon-lg"
-                                className="size-8 text-muted-foreground hover:text-foreground"
-                                onClick={(e: MouseEvent) => { e.stopPropagation(); onEditPost(post.id); }}
-                                title="Edit Draft"
-                              >
-                                <PencilLine className="size-3.5" />
-                              </Button>
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon-lg"
+                              className="size-8 text-muted-foreground hover:text-foreground"
+                              onClick={(e: MouseEvent) => { e.stopPropagation(); onEditPost(post.id); }}
+                              title={post.status === "draft" ? "Edit Draft" : "View & Edit"}
+                            >
+                              <PencilLine className="size-3.5" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon-lg"
