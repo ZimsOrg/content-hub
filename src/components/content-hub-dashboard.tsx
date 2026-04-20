@@ -196,16 +196,43 @@ function formatDayLabel(date: Date) {
 }
 
 function getImageDownloadName(post: Post) {
-  const pathname = post.imageUrl ? new URL(post.imageUrl, "https://content-hub.local").pathname : "";
-  const extension = pathname.split(".").pop()?.split("?")[0];
   const slug = post.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+    .replace(/(^-|-$)/g, "") || "content-hub-image";
 
-  return extension
-    ? `${slug || "content-hub-image"}.${extension}`
-    : `${slug || "content-hub-image"}.jpg`;
+  if (post.imageUrl?.startsWith("data:image/")) {
+    const mimeMatch = post.imageUrl.match(/^data:image\/(\w+)/);
+    const ext = mimeMatch?.[1] === "jpeg" ? "jpg" : (mimeMatch?.[1] || "jpg");
+    return `${slug}.${ext}`;
+  }
+
+  const pathname = post.imageUrl ? new URL(post.imageUrl, "https://content-hub.local").pathname : "";
+  const extension = pathname.split(".").pop()?.split("?")[0];
+  return extension ? `${slug}.${extension}` : `${slug}.jpg`;
+}
+
+function downloadImage(url: string, filename: string) {
+  if (url.startsWith("data:")) {
+    const byteString = atob(url.split(",")[1]);
+    const mimeMatch = url.match(/^data:([^;]+)/);
+    const mime = mimeMatch?.[1] || "image/jpeg";
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    const blob = new Blob([ab], { type: mime });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+  } else {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1148,8 +1175,7 @@ function BoardCardDialog({
                   <Button
                     variant="outline"
                     className="h-11 w-full border-border/40 sm:w-auto"
-                    nativeButton={false}
-                    render={<a href={activePost.imageUrl} download={getImageDownloadName(activePost)} />}
+                    onClick={() => downloadImage(activePost.imageUrl!, getImageDownloadName(activePost))}
                   >
                     <Download />
                     Download Image
@@ -1254,8 +1280,7 @@ function CalendarAgenda({ date, posts }: { date: Date; posts: Post[] }) {
                   <Button
                     variant="outline"
                     className="h-12 w-full text-base border-border/40"
-                    nativeButton={false}
-                    render={<a href={post.imageUrl} download={getImageDownloadName(post)} />}
+                    onClick={() => downloadImage(post.imageUrl!, getImageDownloadName(post))}
                   >
                     <Download />
                     Download Image
@@ -1510,7 +1535,7 @@ function simpleMarkdownToHtml(md: string, images?: { hero?: string; sections?: R
     .replace(/$/, "</p>");
 }
 
-function compressImageFile(file: File, maxWidth = 600, quality = 0.6): Promise<string> {
+function compressImageFile(file: File, maxWidth = 600): Promise<string> {
   return new Promise((resolve) => {
     const img = new window.Image();
     img.onload = () => {
@@ -1520,7 +1545,7 @@ function compressImageFile(file: File, maxWidth = 600, quality = 0.6): Promise<s
       canvas.height = img.height * scale;
       const ctx = canvas.getContext("2d");
       ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      resolve(canvas.toDataURL("image/png"));
     };
     img.src = URL.createObjectURL(file);
   });
